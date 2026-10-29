@@ -1,0 +1,25 @@
+{
+  "name": "oxybook",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.33.4",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "pnpm -r --if-present run build",
+    "test": "pnpm -r --if-present run test && pnpm exec tsx --test spikes/conflicts/conflicts.test.ts",
+    "test:corpus": "pnpm --filter @oxybook/doc-model run test:corpus",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "typecheck": "pnpm -r --if-present run typecheck && tsc -p spikes/conflicts/tsconfig.json --noEmit",
+    "oxybook-roundtrip": "tsx packages/doc-model/src/cli.ts",
+    "dev": "pnpm --parallel --filter @oxybook/server --filter @oxybook/worker run dev"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.6.4",
+    "@types/node": "26.6.6",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,16 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+set -eu
+cd /app
+case "${1:-}" in
+  server)
+    exec node apps/server/dist/main.js
+    ;;
+  worker)
+    exec node apps/worker/dist/main.js
+    ;;
+  *)
+    echo "usage: oxybook <server|worker>" >&2
+    exit 1
+    ;;
+esac
