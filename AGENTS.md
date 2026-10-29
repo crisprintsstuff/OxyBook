@@ -25,7 +25,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is in progress, not finished. The round-trip library, the corpus harness, the conflict-merge spike, `/healthz`, and a GitHub write-path spike exist. `required_signatures` rejects an unsigned `git push` and did not reject a GitHub-signed Git Database API update; the note is `docs/M0-GITHUB-SPIKE.md`. `oxybook-dev propose` can POST a pull request after the push. That POST is unit-tested with a fake `fetch` and has not been run against GitHub. The remaining M0 exit blocker in `docs/MVP.md` is a real pull request against a test repo. A live GitHub App install has not happened; the checklist is `docs/LIVE-INSTALL.md`. Database schema v0 is listed M0 work and is not that exit sentence. The editor and the renderer do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is complete. M1 is not started, and no M1 code is in the tree. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand at `https://github.com/settings/apps/new`. The manifest flow (`/setup/github`) is unverified. Webhook delivery from GitHub is unverified. Database schema v0 is not started and is not part of the M0 exit sentence. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
@@ -49,7 +49,7 @@ docs/M0-GITHUB-SPIKE.md       what the GitHub spike verified, and what it did no
 
 ## How to run it
 
-Requirements: Node.js 24, pnpm 10 (the `packageManager` field), git ≥ 2.38.
+Requirements: Node.js 24, pnpm 10 (the `packageManager` field), git ≥ 2.38. One `oxybook-dev propose` run succeeded on Node v22.23.1 after pnpm printed an Unsupported engine warning. That does not make Node 22 supported.
 
 ```sh
 pnpm install
@@ -60,6 +60,7 @@ pnpm typecheck
 pnpm build
 pnpm oxybook-roundtrip <file-or-directory>
 pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git
+# no leading -- before propose; pnpm forwards it and the parser used to treat "propose" as the file
 ```
 
 `oxybook-roundtrip` prints `PASS` / `FAIL` / `UNPARSEABLE` / `ERROR` per file. Exit code 1 means an identity failure or a crash. Unparseable is reported and does not fail the command. `pnpm test:corpus` prints a markdown table of every file and fails the test if any parseable file is not identical.
@@ -82,4 +83,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- MVP.md's M0 checklist is larger than the code. Do not mark M0 done on a unit test. The remaining exit blocker is a real pull request against a test repo. Opening that pull request is unit-tested only. The schema and a live GitHub App install are still open and are not that exit sentence. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md`: an unsigned push is rejected, and the Git Database API fast-forward from this environment's installation token was accepted. `STATUS.md` is the list of what is still unverified.
+- M0's exit is met by the pull request in `STATUS.md`. Do not mark M1 started. Database schema v0 and a manifest-created App are still open and are not that exit sentence. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.
