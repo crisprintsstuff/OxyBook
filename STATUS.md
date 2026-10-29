@@ -45,6 +45,10 @@ Exit, from that sentence:
 
 ## Changelog
 
+### 2026-10-29 — `pnpm oxybook-dev -- propose` was opening a file named propose
+
+pnpm forwards the `--`, so `process.argv` began with `--` and the parser treated the word `propose` as the file. That run failed with `ENOENT` opening `propose`. A leading `--` is now ignored. The command that worked without it is `pnpm oxybook-dev propose <file> --remote <url>`. `AGENTS.md` and `docs/LIVE-INSTALL.md` show that form.
+
 ### 2026-10-29 — Install attempt: manifest events and the dev server
 
 A live attempt to create the App from `/setup/github` was rejected by GitHub: "Default events unsupported: installation and installation_repositories." `default_events` is now `push` and `pull_request` only. This change did not submit the new manifest to GitHub.

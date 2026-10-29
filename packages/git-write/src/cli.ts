@@ -66,7 +66,7 @@ function optional(argv: string[], flag: string): string | undefined {
 }
 
 export function parseProcessArgs(argv: readonly string[]): CliArgs {
-  const rest = [...argv.slice(2)];
+  const rest = argv.slice(2).filter((arg) => arg !== '--');
   if (rest[0] === 'propose') rest.shift();
   const file = rest.find((arg) => !arg.startsWith('--'));
   if (!file) throw new Error('usage: oxybook-dev propose <file> --remote <url> [options]');

@@ -194,7 +194,7 @@ pnpm --filter @oxybook/github build
 `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY_FILE` must be set in the environment. Then:
 
 ```sh
-pnpm oxybook-dev -- propose path/to/page.md \
+pnpm oxybook-dev propose path/to/page.md \
   --remote https://github.com/<owner>/<repo>.git \
   --github-owner <owner> \
   --github-repo <repo> \

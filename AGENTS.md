@@ -59,7 +59,7 @@ pnpm lint
 pnpm typecheck
 pnpm build
 pnpm oxybook-roundtrip <file-or-directory>
-pnpm oxybook-dev -- propose <file> --remote file:///path/to/remote.git
+pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git
 ```
 
 `oxybook-roundtrip` prints `PASS` / `FAIL` / `UNPARSEABLE` / `ERROR` per file. Exit code 1 means an identity failure or a crash. Unparseable is reported and does not fail the command. `pnpm test:corpus` prints a markdown table of every file and fails the test if any parseable file is not identical.
