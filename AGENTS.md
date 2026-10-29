@@ -24,7 +24,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is in progress, not finished. The round-trip library, the corpus harness, the conflict-merge spike, `/healthz`, and a GitHub write-path spike exist. The database, a live GitHub App install, the editor, and the renderer do not. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is in progress, not finished. The round-trip library, the corpus harness, the conflict-merge spike, `/healthz`, and a GitHub write-path spike exist. `required_signatures` rejects an unsigned `git push` and did not reject a GitHub-signed Git Database API update; the measurement is in `docs/M0-GITHUB-SPIKE.md`. The database, a live GitHub App install, the editor, and the renderer do not. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
@@ -81,4 +81,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- MVP.md's M0 checklist is larger than the code. Do not mark M0 done. The schema, a live GitHub App install, and the signed-commit ruleset question are still open. `STATUS.md` says which of those are unverified and why. `docs/M0-GITHUB-SPIKE.md` is the measurement note.
+- MVP.md's M0 checklist is larger than the code. Do not mark M0 done. The schema and a live GitHub App install are still open. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md`: an unsigned push is rejected, and the Git Database API fast-forward from this environment's installation token was accepted. `STATUS.md` is the list of what is still unverified.
