@@ -9,7 +9,8 @@ Future agents: append a dated entry under Changelog when something meaningful la
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
 - **CI:** On `99fe76f`, both `check` runs succeeded: push [40836564769](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836564769) (job 07:37:00Z–07:37:31Z, 31s) and pull_request [40836572202](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836572202) (job 07:37:03Z–07:37:29Z, 26s). Merge commit `d942fb2` push run [40836670051](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836670051) succeeded (job 07:37:57Z–07:38:20Z, 23s). An earlier current-state line named `d9e725c` / run 40836479834; that run did succeed, and these later SHAs did too.
 - **Docker:** `docker compose up -d --build` built `localhost/oxybook:dev` (engine 29.1.3, Compose 2.40.3). postgres, caddy, mailpit, app, and worker all reported healthy. From inside the containers, `GET /healthz` returned 200 `{"ok":true,"service":"app"}` on port 3000 and 200 `{"ok":true,"service":"worker"}` on port 3001. The image's git is 2.39.5. The stack was then removed with `docker compose down --remove-orphans -v`.
-- **What does not:** There is no editor, renderer, database, GitHub App, or published site. M0's exit in `docs/MVP.md` is not met. The open items are listed under "M0 still open".
+- **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. Details and the command output are in `docs/M0-GITHUB-SPIKE.md`.
+- **What does not:** There is no editor, renderer, database, or published site. A GitHub App has not been installed on a real account, and no GitHub pull request has been opened. The signed-commit ruleset question is still unverified. See "M0 still open".
 
 ## Milestones
 
@@ -25,13 +26,19 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 
 ## M0 still open
 
-`docs/MVP.md` marks M0 done when corpus identity runs in CI, a CLI opens a real pull request whose diff is only the intended change, and a note records signed-commit ruleset behaviour. The identity half is in the tree and has a green `check` on `main`. These are not:
+`docs/MVP.md` marks M0 done when corpus identity runs in CI, a CLI opens a real pull request whose diff is only the intended change, and a note records signed-commit ruleset behaviour. Identity is in the tree. The git half of the write path is proven against a local remote, not against GitHub. Still open:
 
 1. **Database schema v0 and migrations** (Kysely + SQL migrations, `pnpm db:migrate`). Not started. Unverified.
-2. **GitHub App spike.** App Manifest flow creates an app; a webhook is received and verified; a blobless mirror is fetched; a tree is built and pushed to `oxybook/*`; `oxybook-dev propose` opens a pull request. Not started. Unverified.
-3. **Signed-commit rulesets (ARCHITECTURE §4.3).** Whether a ruleset that requires signed commits on `oxybook/*` rejects an unsigned push, and whether the Git Database API is a working fallback. Unverified. Do not assume either outcome.
+2. **Live GitHub App.** Manifest JSON and the callback route are unit-tested against a fake `fetch`. A real app was not created (that needs a public callback URL and a human approving the manifest). Webhook delivery from GitHub is unverified. `POST /repos/{owner}/{repo}/pulls` was not called. See `docs/M0-GITHUB-SPIKE.md`.
+3. **Signed-commit rulesets (ARCHITECTURE §4.3).** On 2026-10-29, `POST /repos/crisprintsstuff/OxyBook/rulesets` returned HTTP 403 `Resource not accessible by integration`. The token's repo permissions were all `false`, including `admin` and `push`. No ruleset was created. The question is unverified. It needs a token that can administer the repository and push a probe branch. Do not assume the Git Database API fallback.
 
 ## Changelog
+
+### 2026-10-29 — GitHub App spike: local write path verified, ruleset still blocked
+
+`packages/github` signs app JWTs, caches installation tokens in memory, and checks `X-Hub-Signature-256` with `timingSafeEqual`. The manifest route and callback are unit-tested against a mocked GitHub. `oxybook-dev propose` pushes to `refs/heads/oxybook/<user>/<slug>-<id>` on a `file://` remote; the diff in that run contained only `docs/a.md`, and a stale `--force-with-lease` was refused. Recorded in `docs/M0-GITHUB-SPIKE.md`.
+
+Not live: installing a GitHub App, receiving a webhook from GitHub, and opening a GitHub pull request. Signed-commit rulesets stay unverified: creating one on `crisprintsstuff/OxyBook` returned HTTP 403 `Resource not accessible by integration`, and the ruleset list was empty afterwards.
 
 ### 2026-10-29 — PR #1 merged; CI head corrected; image health checked
 
