@@ -28,9 +28,10 @@ Requirements: Docker with Compose v2, Node.js 24 LTS, pnpm (via `corepack enable
 cp .env.example .env
 docker compose up -d postgres mailpit caddy   # infrastructure
 pnpm install
-pnpm db:migrate                               # applies migrations to the compose postgres
 pnpm dev                                      # app and worker on the host, with reload
 ```
+
+`pnpm db:migrate` is not implemented. There is no migration runner in this tree. Do not run that command.
 
 Or run everything in containers, as the README quickstart does: `docker compose up -d`. Then open <http://app.localhost:8080>.
 
@@ -40,11 +41,11 @@ To test the GitHub integration, create a personal development GitHub App from th
 
 ```sh
 pnpm test                 # unit tests, all packages
-pnpm test:integration     # needs the compose postgres; uses a local bare git repo instead of GitHub
 pnpm test:corpus          # round-trip identity over the pinned documentation corpus (fetches by SHA)
-pnpm test:e2e             # browser tests for editor flows
 pnpm lint && pnpm typecheck
 ```
+
+`pnpm test:integration` and `pnpm test:e2e` are not implemented. The root `package.json` has no such scripts. Do not run them.
 
 Rules that reviewers enforce:
 

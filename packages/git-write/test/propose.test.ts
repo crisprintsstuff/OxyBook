@@ -244,6 +244,29 @@ describe('propose against a file:// remote', () => {
   });
 });
 
+describe('parseProcessArgs', () => {
+  it('accepts a leading -- and returns the same file and remote', () => {
+    const file = '/tmp/scratch/test-page.md';
+    const remote = 'file:///tmp/seedbare';
+    const shared = [
+      'propose',
+      file,
+      '--remote',
+      remote,
+      '--base',
+      'main',
+      '--path',
+      'docs/test-page.md',
+    ];
+    const without = parseProcessArgs(['node', 'cli.ts', ...shared]);
+    const withSeparator = parseProcessArgs(['node', 'cli.ts', '--', ...shared]);
+    assert.equal(withSeparator.file, without.file);
+    assert.equal(withSeparator.remote, without.remote);
+    assert.equal(withSeparator.file, file);
+    assert.equal(withSeparator.remote, remote);
+  });
+});
+
 describe('github remote for the push', () => {
   it('puts the installation token in the push url and refuses a file remote', () => {
     assert.equal(

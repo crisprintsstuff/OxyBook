@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "pnpm --filter @oxybook/github build && tsc -p tsconfig.json --noEmit",
     "test": "pnpm --filter @oxybook/github build && node --import tsx --test test/*.test.ts",
-    "dev": "node --watch src/main.ts",
+    "dev": "pnpm --filter @oxybook/github build && tsx watch src/main.ts",
     "start": "node dist/main.js"
   },
   "dependencies": {

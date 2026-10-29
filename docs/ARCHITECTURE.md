@@ -208,7 +208,7 @@ Enforcement:
 One GitHub App per OxyBook instance. Self-hosters create theirs with GitHub's App Manifest flow from the setup screen, so they never hand-type permissions.
 
 - Repository permissions: **Contents: read & write**, **Pull requests: read & write**, **Metadata: read**. Nothing else; in particular not **Workflows**, so OxyBook cannot modify `.github/workflows/*` even if a path check were bypassed.
-- Webhook events: `push`, `pull_request`, `installation`, `installation_repositories`.
+- Webhook events on the manifest: `push` and `pull_request`. GitHub delivers `installation` and `installation_repositories` itself when the App has a webhook. Putting those two names in `default_events` makes GitHub reject the manifest.
 - Server-to-server: a JWT signed with the app's private key is exchanged for **installation access tokens** (short-lived; cached in memory until shortly before expiry, never persisted).
 - User-to-server: users may link their GitHub account. When linked and the user has write access, PRs are opened with their user token, so the PR author is the human. Otherwise the PR is opened by the app, and commits carry the user's name with a configurable commit email (default: a per-instance noreply address, so OxyBook does not publish user emails into git history).
 - **DCO-enforcing repos:** a space setting adds a `Signed-off-by:` trailer, but only after the committing user ticks an explicit affirmation in the propose dialog, because a sign-off is a statement the human makes, not the bot.

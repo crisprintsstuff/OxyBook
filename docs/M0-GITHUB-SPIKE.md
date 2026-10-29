@@ -97,7 +97,7 @@ Before this session the branch head was `d284359f4d12f13bb17db60c7cd8fd0e9cf5027
 - RS256 app JWT. `iat` is 60 seconds before the injected clock. `exp` is 600 seconds after `iat`, so it is 9 minutes from "now" and inside GitHub's 10-minute cap. Verified with a keypair generated in the test process.
 - Installation token exchange. A fake `fetch` returns `token` and `expires_at`. The cache returns the same token until 60 seconds before expiry, then asks again. The token is held in a `Map` on the object. This module does not write it anywhere.
 - Webhook `X-Hub-Signature-256` over the bytes in `packages/github/test/fixtures/webhook-body.json`, compared with `crypto.timingSafeEqual`. A different body, secret, or header length is rejected.
-- App manifest JSON: contents write, pull requests write, metadata read, and no workflows permission. Events are `push`, `pull_request`, `installation`, `installation_repositories`.
+- App manifest JSON: contents write, pull requests write, metadata read, and no workflows permission. `default_events` is `push` and `pull_request`. `installation` and `installation_repositories` are not in that list. GitHub rejected a manifest that included them (`Default events unsupported`).
 - Callback handling. `GET /setup/github` returns an HTML form that POSTs the manifest to `https://github.com/settings/apps/new?state=…`. `GET /setup/github/callback` exchanges `code` with a mocked `POST /app-manifests/{code}/conversions`, stores the credentials in memory, and the HTTP response is `{stored, id, slug}` with no private key. Reusing the state is rejected.
 
 ## Still unverified
