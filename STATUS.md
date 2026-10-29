@@ -6,7 +6,8 @@ Future agents: append a dated entry under Changelog when something meaningful la
 
 - **Milestone:** M0, in progress. Not done.
 - **Last update:** 2026-10-29.
-- **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. On 2026-10-29, `pnpm test:corpus` reported 588 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
+- **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
+- **CI:** The `check` job on PR #1 failed in about 3 seconds with zero steps. The check-run annotation says the job was not started because recent account payments failed or the spending limit needs to be increased. The workflow file and `pnpm@10.33.4` (`packageManager`, lockfile v9, `pnpm install --frozen-lockfile` on a clean archive) are not the cause. A new push will stay red until GitHub billing lets a runner start. Unverified that a later run is green.
 - **What does not:** There is no editor, renderer, database, GitHub App, or published site. Opening a page, proposing a PR, and serving docs are not implemented. The Docker image has not been built or started (Docker was unavailable; unverified). This is pre-product infrastructure.
 
 ## Milestones
@@ -22,6 +23,12 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | M4 — Production readiness, v1.0 | not started |
 
 ## Changelog
+
+### 2026-10-29 — Callout containers are one block; CI failure is billing
+
+`:::name`, `:::name Title`, `::: name Title`, and `:::name[Title]` at column 0 fold into one `callout` after remark parse. The block owns the bytes through the matching `:::`, including nested containers and blank lines. Marker lines are not editable spans. An unclosed container is one raw block through EOF. Fences and HTML are not scanned. Re-measured corpus: 594 pass, 0 fail, 1 unparseable.
+
+CI `check` on `8ac0dff` (runs 40835691209 and 40835716025) never started a step. Annotation: "The job was not started because recent account payments have failed or your spending limit needs to be increased." `pnpm@10.33.4` exists and `pnpm install --frozen-lockfile` succeeds against the committed lockfile. The workflow was not changed to skip tests.
 
 ### 2026-10-29 — M0 slice: round-trip library and scaffolding
 
