@@ -96,6 +96,10 @@ importers:
         version: 7.0.2
 
   packages/git-write:
+    dependencies:
+      '@oxybook/github':
+        specifier: workspace:*
+        version: link:../github
     devDependencies:
       '@types/node':
         specifier: 26.6.6

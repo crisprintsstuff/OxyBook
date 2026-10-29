@@ -11,4 +11,13 @@ export {
   MemoryAppCredentials,
   manifestCreateUrl,
 } from './manifest.js';
+export {
+  type OpenedPullRequest,
+  type OpenPullRequestInput,
+  openPullRequest,
+  openPullRequestFromInstallation,
+  type PullRequestBodyInput,
+  pullRequestHead,
+  renderPullRequestBody,
+} from './pulls.js';
 export { verifyWebhookSignature } from './webhook.js';

@@ -21,6 +21,11 @@ export interface ProposeAuthor {
 export interface ProposeRequest {
   /** Git remote. A local bare repo must be a file:// URL so --filter=blob:none is honored. */
   remote: string;
+  /**
+   * Push destination when it must differ from `remote`.
+   * Clone and fetch keep using `remote`, so a token used only for the push is not stored as origin.
+   */
+  pushRemote?: string;
   /** Bare mirror directory. Created if missing. */
   mirrorDir: string;
   /** Branch name on the remote, without refs/heads/. */
@@ -179,9 +184,10 @@ export function propose(request: ProposeRequest): ProposeResult {
   ).trim();
 
   const url = toGitRemote(request.remote);
+  const pushUrl = request.pushRemote ?? url;
   runGit(request.mirrorDir, [
     'push',
-    url,
+    pushUrl,
     `${commit}:${request.ref}`,
     `--force-with-lease=${request.ref}:${request.expectedSha}`,
   ]);
@@ -206,15 +212,15 @@ export function propose(request: ProposeRequest): ProposeResult {
   };
 }
 
-export function formatProposeResult(result: ProposeResult): string {
-  return [
+export function formatProposeResult(result: ProposeResult, pullRequestUrl?: string): string {
+  const lines = [
     `commit ${result.commit}`,
     `ref ${result.ref}`,
     `base ${result.base}`,
     `author ${result.authorName}`,
     `bare ${result.bare}`,
-    '--- diff ---',
-    result.diff.trimEnd(),
-    '',
-  ].join('\n');
+  ];
+  if (pullRequestUrl) lines.push(`pr ${pullRequestUrl}`);
+  lines.push('--- diff ---', result.diff.trimEnd(), '');
+  return lines.join('\n');
 }

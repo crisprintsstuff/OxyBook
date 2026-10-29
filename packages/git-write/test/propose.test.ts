@@ -7,6 +7,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { authenticatedGithubPushUrl, parseProcessArgs, runPropose } from '../src/cli.js';
 import { StaleLeaseError } from '../src/git.js';
 import {
   assertAllowedPath,
@@ -179,5 +180,107 @@ describe('propose against a file:// remote', () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+
+  it('opens a pull request after the push and leaves the base branch in place', async () => {
+    const { root, remote, src } = setupRemote();
+    try {
+      const edited = path.join(root, 'edited.md');
+      const mirror = path.join(root, 'mirror');
+      writeFileSync(edited, 'alpha from cli\n');
+      const baseBefore = git(src, ['rev-parse', 'main']).trim();
+      const args = parseProcessArgs([
+        'node',
+        'cli.ts',
+        'propose',
+        edited,
+        '--remote',
+        remote,
+        '--mirror',
+        mirror,
+        '--path',
+        'docs/a.md',
+        '--user',
+        'ada',
+        '--slug',
+        'page',
+        '--draft',
+        '1',
+        '--author-name',
+        'Ada Lovelace',
+        '--author-email',
+        'ada@example.com',
+        '--github-owner',
+        'acme',
+        '--github-repo',
+        'docs',
+        '--installation-id',
+        '42',
+        '--draft-url',
+        'https://tunnel.example/drafts/1',
+      ]);
+      const stdout = await runPropose(args, {
+        installationToken: async () => 'ghs_test',
+        openPullRequest: async (input) => {
+          assert.equal(input.token, 'ghs_test');
+          assert.equal(input.owner, 'acme');
+          assert.equal(input.repo, 'docs');
+          assert.equal(input.head, 'oxybook/ada/page-1');
+          assert.equal(input.base, 'main');
+          assert.notEqual(input.head, input.base);
+          assert.match(input.body, /Pages changed:\n- docs\/a\.md/);
+          assert.match(input.body, /Link back: https:\/\/tunnel\.example\/drafts\/1/);
+          return { number: 4, url: 'https://github.com/acme/docs/pull/4' };
+        },
+      });
+      assert.match(stdout, /pr https:\/\/github.com\/acme\/docs\/pull\/4\n/);
+      assert.doesNotMatch(stdout, /ghs_test/);
+      assert.equal(git(src, ['rev-parse', 'main']).trim(), baseBefore);
+      const bare = remote.replace('file://', '');
+      assert.equal(git(bare, ['rev-parse', 'refs/heads/main']).trim(), baseBefore);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('github remote for the push', () => {
+  it('puts the installation token in the push url and refuses a file remote', () => {
+    assert.equal(
+      authenticatedGithubPushUrl('https://github.com/acme/docs.git', 'ghs_test', 'acme', 'docs'),
+      'https://x-access-token:ghs_test@github.com/acme/docs.git',
+    );
+    assert.throws(
+      () => authenticatedGithubPushUrl('file:///tmp/remote.git', 'ghs_test', 'acme', 'docs'),
+      /https:\/\/github.com\/acme\/docs\.git/,
+    );
+  });
+
+  it('rejects a file remote before pushing when a pull request was requested', async () => {
+    const args = parseProcessArgs([
+      'node',
+      'cli.ts',
+      'propose',
+      'docs/a.md',
+      '--remote',
+      'file:///tmp/remote.git',
+      '--github-owner',
+      'acme',
+      '--github-repo',
+      'docs',
+      '--installation-id',
+      '42',
+      '--draft-url',
+      'https://tunnel.example/',
+    ]);
+    await assert.rejects(
+      () => runPropose(args, { installationToken: async () => 'ghs_secret' }),
+      (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.match(error.message, /https:\/\/github.com\/acme\/docs\.git/);
+        assert.equal(error.message.includes('ghs_secret'), false);
+        return true;
+      },
+    );
   });
 });

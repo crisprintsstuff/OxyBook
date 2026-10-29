@@ -4,8 +4,24 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  InstallationTokenCache,
+  type OpenedPullRequest,
+  type OpenPullRequestInput,
+  openPullRequest,
+  pullRequestHead,
+  renderPullRequestBody,
+  signAppJwt,
+} from '@oxybook/github';
 import { runGit } from './git.js';
 import { formatProposeResult, propose, toGitRemote } from './propose.js';
+
+export interface GithubProposeTarget {
+  owner: string;
+  repo: string;
+  installationId: number;
+  draftUrl?: string;
+}
 
 export interface CliArgs {
   file: string;
@@ -20,6 +36,15 @@ export interface CliArgs {
   message: string;
   authorName: string;
   authorEmail: string;
+  github?: GithubProposeTarget;
+}
+
+export interface ProposeCliDeps {
+  installationToken?: (installationId: number) => Promise<string>;
+  openPullRequest?: (
+    input: OpenPullRequestInput,
+    options?: { fetch?: typeof fetch; apiBase?: string },
+  ) => Promise<OpenedPullRequest>;
 }
 
 function take(argv: string[], flag: string, fallback?: string): string {
@@ -32,8 +57,17 @@ function take(argv: string[], flag: string, fallback?: string): string {
   return value;
 }
 
+function optional(argv: string[], flag: string): string | undefined {
+  const index = argv.indexOf(flag);
+  if (index < 0) return undefined;
+  const value = argv[index + 1];
+  if (value === undefined || value.startsWith('--')) throw new Error(`missing ${flag}`);
+  return value;
+}
+
 export function parseProcessArgs(argv: readonly string[]): CliArgs {
   const rest = [...argv.slice(2)];
+  if (rest[0] === 'propose') rest.shift();
   const file = rest.find((arg) => !arg.startsWith('--'));
   if (!file) throw new Error('usage: oxybook-dev propose <file> --remote <url> [options]');
   const remote = take(rest, '--remote');
@@ -42,6 +76,24 @@ export function parseProcessArgs(argv: readonly string[]): CliArgs {
   const user = take(rest, '--user', 'dev');
   const slug = take(rest, '--slug', 'page');
   const draft = take(rest, '--draft', '1');
+  const githubOwner = optional(rest, '--github-owner');
+  let github: GithubProposeTarget | undefined;
+  if (githubOwner !== undefined) {
+    const repo = optional(rest, '--github-repo');
+    const installationRaw = optional(rest, '--installation-id');
+    const installationId = installationRaw === undefined ? Number.NaN : Number(installationRaw);
+    if (!repo) throw new Error('missing --github-repo');
+    if (!Number.isInteger(installationId) || installationId <= 0) {
+      throw new Error('--installation-id must be a positive integer');
+    }
+    const draftUrl = optional(rest, '--draft-url');
+    github = {
+      owner: githubOwner,
+      repo,
+      installationId,
+      ...(draftUrl ? { draftUrl } : {}),
+    };
+  }
   return {
     file,
     remote,
@@ -55,7 +107,31 @@ export function parseProcessArgs(argv: readonly string[]): CliArgs {
     message: take(rest, '--message', `Update ${repoPath}`),
     authorName: take(rest, '--author-name', 'OxyBook Dev'),
     authorEmail: take(rest, '--author-email', 'dev@localhost'),
+    ...(github ? { github } : {}),
   };
+}
+
+/** Push URL with the installation token. Clone/fetch keep the token-free remote. */
+export function authenticatedGithubPushUrl(
+  remote: string,
+  token: string,
+  owner: string,
+  repo: string,
+): string {
+  let url: URL;
+  try {
+    url = new URL(remote);
+  } catch {
+    throw new Error(`remote must be https://github.com/${owner}/${repo}.git`);
+  }
+  const pathName = url.pathname.replace(/\/$/, '');
+  const allowed = [`/${owner}/${repo}`, `/${owner}/${repo}.git`];
+  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || !allowed.includes(pathName)) {
+    throw new Error(`remote must be https://github.com/${owner}/${repo}.git`);
+  }
+  url.username = 'x-access-token';
+  url.password = token;
+  return url.href;
 }
 
 export function expectedRemoteSha(remote: string, ref: string): string {
@@ -64,10 +140,51 @@ export function expectedRemoteSha(remote: string, ref: string): string {
   return output.split(/\s+/)[0] ?? '';
 }
 
-export function runPropose(args: CliArgs): string {
+async function defaultInstallationToken(installationId: number): Promise<string> {
+  const appId = process.env.GITHUB_APP_ID;
+  const keyFile = process.env.GITHUB_APP_PRIVATE_KEY_FILE;
+  if (!appId || !keyFile) {
+    throw new Error(
+      'GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY_FILE are required to open a pull request',
+    );
+  }
+  const privateKeyPem = readFileSync(keyFile, 'utf8');
+  const cache = new InstallationTokenCache({
+    signJwt: () => signAppJwt({ appId, privateKeyPem }),
+  });
+  return cache.get(installationId);
+}
+
+function linkBack(args: CliArgs): string {
+  const url = args.github?.draftUrl ?? process.env.OXYBOOK_PUBLIC_URL;
+  if (!url) {
+    throw new Error(
+      'pass --draft-url or set OXYBOOK_PUBLIC_URL so the pull request body can link back',
+    );
+  }
+  return url;
+}
+
+export async function runPropose(args: CliArgs, deps: ProposeCliDeps = {}): Promise<string> {
   const ref = `refs/heads/oxybook/${args.user}/${args.slug}-${args.draft}`;
+  let pushRemote: string | undefined;
+  let token: string | undefined;
+  let draftLink: string | undefined;
+  if (args.github) {
+    draftLink = linkBack(args);
+    token = await (deps.installationToken ?? defaultInstallationToken)(args.github.installationId);
+    if (!deps.openPullRequest) {
+      pushRemote = authenticatedGithubPushUrl(
+        args.remote,
+        token,
+        args.github.owner,
+        args.github.repo,
+      );
+    }
+  }
   const result = propose({
     remote: args.remote,
+    ...(pushRemote ? { pushRemote } : {}),
     mirrorDir: args.mirrorDir,
     baseBranch: args.baseBranch,
     contentRoot: args.contentRoot,
@@ -78,7 +195,23 @@ export function runPropose(args: CliArgs): string {
     ref,
     expectedSha: expectedRemoteSha(args.remote, ref),
   });
-  return formatProposeResult(result);
+  if (!args.github || token === undefined || draftLink === undefined)
+    return formatProposeResult(result);
+  const opener = deps.openPullRequest ?? openPullRequest;
+  const opened = await opener({
+    owner: args.github.owner,
+    repo: args.github.repo,
+    title: args.message,
+    head: pullRequestHead(result.ref, args.baseBranch),
+    base: args.baseBranch,
+    body: renderPullRequestBody({
+      summary: args.message,
+      changedPaths: result.changedPaths,
+      linkBack: draftLink,
+    }),
+    token,
+  });
+  return formatProposeResult(result, opened.url);
 }
 
 function invokedDirectly(): boolean {
@@ -88,11 +221,13 @@ function invokedDirectly(): boolean {
 }
 
 if (invokedDirectly()) {
-  try {
-    process.stdout.write(runPropose(parseProcessArgs(process.argv)));
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'oxybook-dev failed';
-    console.error(message);
-    process.exit(1);
-  }
+  runPropose(parseProcessArgs(process.argv))
+    .then((text) => {
+      process.stdout.write(text);
+    })
+    .catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : 'oxybook-dev failed';
+      console.error(message);
+      process.exit(1);
+    });
 }

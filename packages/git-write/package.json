@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "description": "Build a commit from a blobless mirror and push it to an oxybook/* ref.",
+  "description": "Build a commit from a blobless mirror, push it to an oxybook/* ref, and open a GitHub pull request.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -16,8 +16,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/*.test.ts"
+    "typecheck": "pnpm --filter @oxybook/github build && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @oxybook/github build && node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@oxybook/github": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
