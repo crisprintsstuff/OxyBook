@@ -7,7 +7,7 @@ Future agents: append a dated entry under Changelog when something meaningful la
 - **Milestone:** M0, in progress. Not done.
 - **Last update:** 2026-10-29.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
-- **CI:** The `check` job on PR #1 failed in about 3 seconds with zero steps. The check-run annotation says the job was not started because recent account payments failed or the spending limit needs to be increased. The workflow file and `pnpm@10.33.4` (`packageManager`, lockfile v9, `pnpm install --frozen-lockfile` on a clean archive) are not the cause. A new push will stay red until GitHub billing lets a runner start. Unverified that a later run is green.
+- **CI:** The first `check` runs failed in a few seconds with zero steps because Actions billing blocked the job (annotation on runs 40835691209 and 40835716025). Those runs were later re-run successfully. `check` on `d9e725c` (run 40836479834) completed green: install, lint, typecheck, test, and corpus.
 - **What does not:** There is no editor, renderer, database, GitHub App, or published site. Opening a page, proposing a PR, and serving docs are not implemented. The Docker image has not been built or started (Docker was unavailable; unverified). This is pre-product infrastructure.
 
 ## Milestones
@@ -23,6 +23,10 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | M4 — Production readiness, v1.0 | not started |
 
 ## Changelog
+
+### 2026-10-29 — `check` is green on `d9e725c`
+
+Run 40836479834 completed successfully after the callout fold. Lint, typecheck, unit tests, and `pnpm test:corpus` all passed. The earlier red runs were the billing block described below, not a test failure.
 
 ### 2026-10-29 — Callout containers are one block; CI failure is billing
 
