@@ -1,0 +1,12 @@
+.git
+node_modules
+**/node_modules
+**/dist
+corpus/cache
+spikes/conflicts/tmp
+**/*.test.ts
+**/test
+.env
+*.md
+!corpus/fixtures/**
+!docs/**

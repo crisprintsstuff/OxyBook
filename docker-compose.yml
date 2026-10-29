@@ -66,15 +66,11 @@ services:
       retries: 20
 
   app:
-    # PLACEHOLDER: OxyBook's own image does not exist yet. It will be built from
-    # the repository's Dockerfile (Node.js 24 on Debian bookworm, git >= 2.38).
-    # Until then, `docker compose up` starts the infrastructure services and these
-    # two services fail to pull. Override with OXYBOOK_IMAGE once an image exists.
     image: ${OXYBOOK_IMAGE:-localhost/oxybook:dev}
-    # build:
-    #   context: .
-    #   target: dev
-    command: ["oxybook", "server"]        # placeholder entrypoint
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["oxybook", "server"]
     restart: unless-stopped
     environment:
       <<: *oxybook-env
@@ -100,9 +96,11 @@ services:
       start_period: 20s
 
   worker:
-    # PLACEHOLDER: same image as app, different command (see note on app).
     image: ${OXYBOOK_IMAGE:-localhost/oxybook:dev}
-    command: ["oxybook", "worker"]        # placeholder entrypoint
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["oxybook", "worker"]
     restart: unless-stopped
     environment:
       <<: *oxybook-env
