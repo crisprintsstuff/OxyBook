@@ -7,10 +7,11 @@ Future agents: append a dated entry under Changelog when something meaningful la
 - **Milestone:** M0, in progress. Not done.
 - **Last update:** 2026-10-29.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
-- **CI:** On `99fe76f`, both `check` runs succeeded: push [40836564769](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836564769) (job 07:37:00Z–07:37:31Z, 31s) and pull_request [40836572202](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836572202) (job 07:37:03Z–07:37:29Z, 26s). Merge commit `d942fb2` push run [40836670051](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836670051) succeeded (job 07:37:57Z–07:38:20Z, 23s). An earlier current-state line named `d9e725c` / run 40836479834; that run did succeed, and these later SHAs did too.
+- **CI:** `main` is `4837c97c7e546e80b31b265d67e24c70ae910939`. Push run [40898410005](https://github.com/crisprintsstuff/OxyBook/actions/runs/40898410005) succeeded. The `check` job ran 2026-10-29T15:07:55Z–15:08:27Z (32s). `.github/workflows/ci.yml` runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:corpus`. That corpus step fetches the pinned corpus repos, so the job needs network. History, not this head: PR #4 at `b6318ec9` had successful `pull_request` run [40898205659](https://github.com/crisprintsstuff/OxyBook/actions/runs/40898205659) and `push` run [40898195014](https://github.com/crisprintsstuff/OxyBook/actions/runs/40898195014). Earlier still: `99fe76f` push [40836564769](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836564769) (job 07:37:00Z–07:37:31Z, 31s) and pull_request [40836572202](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836572202) (job 07:37:03Z–07:37:29Z, 26s); merge `d942fb2` push [40836670051](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836670051) (job 07:37:57Z–07:38:20Z, 23s).
 - **Docker:** `docker compose up -d --build` built `localhost/oxybook:dev` (engine 29.1.3, Compose 2.40.3). postgres, caddy, mailpit, app, and worker all reported healthy. From inside the containers, `GET /healthz` returned 200 `{"ok":true,"service":"app"}` on port 3000 and 200 `{"ok":true,"service":"worker"}` on port 3001. The image's git is 2.39.5. The stack was then removed with `docker compose down --remove-orphans -v`.
-- **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. An unsigned `git push` to `ruleset-probe-test` is rejected by ruleset `26114519` (`GH013`, commits must have verified signatures). A fast-forward `PATCH /git/refs/heads/ruleset-probe-test` of a Git Database API commit returned HTTP 200; GitHub had signed that commit (`verification.verified: true`, `reason: "valid"`). The branch head is now `c915f0780c13f25cdf01870fcda216b721c576cf`. Details are in `docs/M0-GITHUB-SPIKE.md`.
-- **What does not:** There is no editor, renderer, database, or published site. A GitHub App has not been installed on a real account, and no GitHub pull request has been opened by OxyBook. The ruleset and `ruleset-probe-test` are still in place. See "M0 still open".
+- **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. An unsigned `git push` to `ruleset-probe-test` was rejected by ruleset `26114519` (`GH013`, commits must have verified signatures). A fast-forward `PATCH /git/refs/heads/ruleset-probe-test` of a Git Database API commit returned HTTP 200; GitHub had signed that commit (`verification.verified: true`, `reason: "valid"`). The measured head was `c915f0780c13f25cdf01870fcda216b721c576cf`. Details are in `docs/M0-GITHUB-SPIKE.md`.
+- **Signed-commit note:** The note `docs/MVP.md` asks for exists: `docs/M0-GITHUB-SPIKE.md`. It concludes that `required_signatures` rejects an unsigned `git push` (`GH013`) and accepts a GitHub-signed Git Database API fast-forward (HTTP 200, `verification.verified: true`, `reason: "valid"`).
+- **What does not:** There is no editor, renderer, database, or published site. A GitHub App has not been installed on a real account, and no GitHub pull request has been opened by OxyBook. Probe scaffolding (ruleset `ruleset-probe`, id `26114519`, and branch `ruleset-probe-test`) was removed on 2026-10-29 after the measurement was recorded, the ruleset first and then the branch, because the ruleset's own `deletion` rule blocks removing a matching branch while it is active. Removing them changed nothing about the measurement. See "M0 still open".
 
 ## Milestones
 
@@ -26,13 +27,28 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 
 ## M0 still open
 
-`docs/MVP.md` marks M0 done when corpus identity runs in CI, a CLI opens a real pull request whose diff is only the intended change, and a note records signed-commit ruleset behaviour. Identity is in the tree. The git half of the write path is proven against a local remote, not against GitHub. Still open:
+`docs/MVP.md` says M0 is done when corpus identity runs in CI, the CLI opens a real pull request against a test repo whose diff is only the intended change, and a written note records the signed-commit ruleset behaviour. That is the exit sentence. Two of the three are met. The third is not, so M0 stays in progress.
+
+Exit, from that sentence:
+
+1. **Corpus identity in CI.** Met. `.github/workflows/ci.yml` runs `pnpm test:corpus`.
+2. **Written note.** Met. `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour. See "Signed-commit note" above.
+3. **Real pull request.** Not met. This is the remaining M0 exit blocker. `oxybook-dev propose` has pushed to a local `file://` remote. It has not opened a pull request against a test repo.
+
+`docs/MVP.md` also lists M0 work that is not part of that exit sentence. Still open, and not the exit blocker:
 
 1. **Database schema v0 and migrations** (Kysely + SQL migrations, `pnpm db:migrate`). Not started. Unverified.
 2. **Live GitHub App.** Manifest JSON and the callback route are unit-tested against a fake `fetch`. A real app was not created (that needs a public callback URL and a human approving the manifest). Webhook delivery from GitHub is unverified. `POST /repos/{owner}/{repo}/pulls` was not called. See `docs/M0-GITHUB-SPIKE.md`.
-3. **Signed-commit rulesets (ARCHITECTURE §4.3).** Measured. An unsigned `git push` is rejected (`GH013`). A Git Database API commit created by this environment's installation token is signed by GitHub and a non-force ref update returned HTTP 200. Reading the ruleset on this public repo is HTTP 200 with no credentials, and HTTP 200 for this installation token with `X-Accepted-Github-Permissions: metadata=read`. Creating a ruleset is still HTTP 403 `Resource not accessible by integration`. A private-repo ruleset read was not run. See `docs/M0-GITHUB-SPIKE.md`.
 
 ## Changelog
+
+### 2026-10-29 — Status handoff matches `main` after the probe was removed
+
+`main` is `4837c97c7e546e80b31b265d67e24c70ae910939`. Push run 40898410005 succeeded (`check`, 2026-10-29T15:07:55Z–15:08:27Z, 32s). The current-state CI line had still named `99fe76f` and `d942fb2`. Those runs stay in the history sentence. `.github/workflows/ci.yml` runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:corpus`. The corpus step fetches the pinned repos, so the job needs network.
+
+The note `docs/MVP.md` asks for is `docs/M0-GITHUB-SPIKE.md`. Corpus identity in CI and that note meet two of the three exit checks. The remaining exit blocker is a real pull request against a test repo. Database schema v0 is listed as M0 work in `docs/MVP.md` and is not part of that exit sentence. It is still not started.
+
+Ruleset `ruleset-probe` (id `26114519`) and branch `ruleset-probe-test` were removed on 2026-10-29 after the measurement was recorded, the ruleset first and then the branch, because the ruleset's `deletion` rule blocks removing a matching branch while it is active. `GET /repos/crisprintsstuff/OxyBook/rulesets` returned an empty list. `GET /repos/crisprintsstuff/OxyBook/branches/ruleset-probe-test` returned HTTP 404. Removing them changed nothing about the measurement. The entry below still says they were left in place. That was true when it was written.
 
 ### 2026-10-29 — ARCHITECTURE §4.3 answered: required signatures do reject the push
 

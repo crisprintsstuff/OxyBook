@@ -45,7 +45,7 @@ Two reads of that ruleset, same day:
 
 That is not the same as a token GitHub refuses. `POST /repos/crisprintsstuff/OxyBook/rulesets` with an installation token, recorded in the changelog entry that thought the question was still blocked, returned HTTP 403 `{"message":"Resource not accessible by integration","documentation_url":"https://docs.github.com/rest/repos/rules#create-a-repository-ruleset","status":"403"}`. An App token is not an anonymous reader: when GitHub answers `403 Resource not accessible by integration`, the App learns nothing, even though an anonymous GET of this public repo returns 200. A private customer repo has no anonymous GET. That private-repo GET was not called here. The App needs `administration: read` (or an App-side setting) before a refused token can be treated as "no signed-commit rule".
 
-The ruleset's `deletion` rule blocks deleting `ruleset-probe-test`. The ruleset has to be removed before the branch can. Neither was deleted in this run.
+The ruleset's `deletion` rule blocks deleting `ruleset-probe-test`. The ruleset has to be removed before the branch can. Neither was deleted in this run. On 2026-10-29, after this measurement was recorded, that scaffolding was removed, the ruleset first and then the branch, because the `deletion` rule blocks removing a matching branch while the ruleset is active; removing them changed nothing about the measurement (`GET /repos/crisprintsstuff/OxyBook/rulesets` is an empty list, `GET /repos/crisprintsstuff/OxyBook/branches/ruleset-probe-test` is HTTP 404).
 
 **Plain `git push`.** Not re-run here. The repo owner's unsigned push of `2b6d07cee53df072a7437659dbf1278e5d01de02` to `ruleset-probe-test` was rejected and the branch did not move. The remote error was:
 
