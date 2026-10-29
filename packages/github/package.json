@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "description": "GitHub App auth, webhook verification, and manifest exchange. M0 spike.",
+  "description": "GitHub App auth, webhook verification, manifest exchange, and opening pull requests.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
