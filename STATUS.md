@@ -9,8 +9,8 @@ Future agents: append a dated entry under Changelog when something meaningful la
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
 - **CI:** On `99fe76f`, both `check` runs succeeded: push [40836564769](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836564769) (job 07:37:00Z–07:37:31Z, 31s) and pull_request [40836572202](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836572202) (job 07:37:03Z–07:37:29Z, 26s). Merge commit `d942fb2` push run [40836670051](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836670051) succeeded (job 07:37:57Z–07:38:20Z, 23s). An earlier current-state line named `d9e725c` / run 40836479834; that run did succeed, and these later SHAs did too.
 - **Docker:** `docker compose up -d --build` built `localhost/oxybook:dev` (engine 29.1.3, Compose 2.40.3). postgres, caddy, mailpit, app, and worker all reported healthy. From inside the containers, `GET /healthz` returned 200 `{"ok":true,"service":"app"}` on port 3000 and 200 `{"ok":true,"service":"worker"}` on port 3001. The image's git is 2.39.5. The stack was then removed with `docker compose down --remove-orphans -v`.
-- **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. Details and the command output are in `docs/M0-GITHUB-SPIKE.md`.
-- **What does not:** There is no editor, renderer, database, or published site. A GitHub App has not been installed on a real account, and no GitHub pull request has been opened. The signed-commit ruleset question is still unverified. See "M0 still open".
+- **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. An unsigned `git push` to `ruleset-probe-test` is rejected by ruleset `26114519` (`GH013`, commits must have verified signatures). A fast-forward `PATCH /git/refs/heads/ruleset-probe-test` of a Git Database API commit returned HTTP 200; GitHub had signed that commit (`verification.verified: true`, `reason: "valid"`). The branch head is now `c915f0780c13f25cdf01870fcda216b721c576cf`. Details are in `docs/M0-GITHUB-SPIKE.md`.
+- **What does not:** There is no editor, renderer, database, or published site. A GitHub App has not been installed on a real account, and no GitHub pull request has been opened by OxyBook. The ruleset and `ruleset-probe-test` are still in place. See "M0 still open".
 
 ## Milestones
 
@@ -30,9 +30,15 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 
 1. **Database schema v0 and migrations** (Kysely + SQL migrations, `pnpm db:migrate`). Not started. Unverified.
 2. **Live GitHub App.** Manifest JSON and the callback route are unit-tested against a fake `fetch`. A real app was not created (that needs a public callback URL and a human approving the manifest). Webhook delivery from GitHub is unverified. `POST /repos/{owner}/{repo}/pulls` was not called. See `docs/M0-GITHUB-SPIKE.md`.
-3. **Signed-commit rulesets (ARCHITECTURE §4.3).** On 2026-10-29, `POST /repos/crisprintsstuff/OxyBook/rulesets` returned HTTP 403 `Resource not accessible by integration`. The token's repo permissions were all `false`, including `admin` and `push`. No ruleset was created. The question is unverified. It needs a token that can administer the repository and push a probe branch. Do not assume the Git Database API fallback.
+3. **Signed-commit rulesets (ARCHITECTURE §4.3).** Measured. An unsigned `git push` is rejected (`GH013`). A Git Database API commit created by this environment's installation token is signed by GitHub and a non-force ref update returned HTTP 200. Reading the ruleset on this public repo is HTTP 200 with no credentials, and HTTP 200 for this installation token with `X-Accepted-Github-Permissions: metadata=read`. Creating a ruleset is still HTTP 403 `Resource not accessible by integration`. A private-repo ruleset read was not run. See `docs/M0-GITHUB-SPIKE.md`.
 
 ## Changelog
+
+### 2026-10-29 — ARCHITECTURE §4.3 answered: required signatures do reject the push
+
+Recorded in PR #4. PR #3 merged as `90f4fd72815994f6e0bace84c392cefca13628ed`. The entry below still says the ruleset question was unverified. That was true when it was written. It is not true after the probe on ruleset `26114519`.
+
+An unsigned `git push` of `2b6d07cee53df072a7437659dbf1278e5d01de02` to `ruleset-probe-test` is rejected with `GH013` (commits must have verified signatures). That push was the repo owner's, not re-run here. `PATCH /git/refs/heads/ruleset-probe-test` with `force: false` and commit `c915f0780c13f25cdf01870fcda216b721c576cf` returned HTTP 200. GitHub signed that Git Database API commit (`verified: true`, `reason: "valid"`) for `cursor[bot]`. The head moved from `d284359f4d12f13bb17db60c7cd8fd0e9cf5027c` to `c915f0780c13f25cdf01870fcda216b721c576cf`. The ruleset and the branch were left in place. Full status codes and the permissions split (anonymous GET 200, this installation token GET 200 via `metadata=read`, POST create 403) are in `docs/M0-GITHUB-SPIKE.md`.
 
 ### 2026-10-29 — GitHub App spike: local write path verified, ruleset still blocked
 
@@ -86,6 +92,6 @@ Settled. Do not re-open these without a written reason that the invariant or the
 
 From the design docs. Not a wishlist.
 
-- **Signed commits on `oxybook/*` (ARCHITECTURE §4.3).** Rulesets that require signed commits may reject unsigned commits pushed by the worker. The suggested fallback is the Git Database API. Unverified. Do not assume either behavior.
+- **Signed commits on `oxybook/*` (ARCHITECTURE §4.3).** Answered for this probe. `required_signatures` rejects an unsigned `git push` (`GH013`). A Git Database API commit made by the installation token in this environment is signed by GitHub and the fast-forward ref update returned HTTP 200. Not answered: the same API call with a user token, and a ruleset read on a private repo. See `docs/M0-GITHUB-SPIKE.md`.
 - **Which built-in components ship in M1 (MVP.md H3).** Callout, Tabs, Card, and CodeGroup are a starting guess. The real list waits on a compatibility count over the corpus (unknown components, imports, expressions, directives). That count has not been run. Identity passing does not answer it.
 - **Material for MkDocs `!!! note` and other pymdown extensions (MVP.md H3).** v1 leaves them as raw blocks. Native support is explicitly post-v1 and depends on the same unrun report.
