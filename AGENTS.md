@@ -12,6 +12,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 4. `docs/M0-NOTES.md` — what the round-trip library actually guarantees, the measured corpus numbers, and where the design docs are wrong or thin.
 5. `docs/M0-GITHUB-SPIKE.md` — which GitHub and git-write checks were run for real, and which are still fakes.
 6. `STATUS.md` — what is in progress. That file is the status source of truth. Do not duplicate it here.
+7. `docs/LIVE-INSTALL.md` — the owner's checklist for a live GitHub App. That install has not been done.
 
 ## Hard constraints
 
@@ -24,7 +25,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is in progress, not finished. The round-trip library, the corpus harness, the conflict-merge spike, `/healthz`, and a GitHub write-path spike exist. `required_signatures` rejects an unsigned `git push` and did not reject a GitHub-signed Git Database API update; the note is `docs/M0-GITHUB-SPIKE.md`. The remaining M0 exit blocker in `docs/MVP.md` is a real pull request against a test repo. Database schema v0 is listed M0 work and is not that exit sentence. A live GitHub App install, the editor, and the renderer do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is in progress, not finished. The round-trip library, the corpus harness, the conflict-merge spike, `/healthz`, and a GitHub write-path spike exist. `required_signatures` rejects an unsigned `git push` and did not reject a GitHub-signed Git Database API update; the note is `docs/M0-GITHUB-SPIKE.md`. `oxybook-dev propose` can POST a pull request after the push. That POST is unit-tested with a fake `fetch` and has not been run against GitHub. The remaining M0 exit blocker in `docs/MVP.md` is a real pull request against a test repo. A live GitHub App install has not happened; the checklist is `docs/LIVE-INSTALL.md`. Database schema v0 is listed M0 work and is not that exit sentence. The editor and the renderer do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
@@ -32,7 +33,7 @@ M0 is in progress, not finished. The round-trip library, the corpus harness, the
 apps/server            AGPL   HTTP process. /healthz, GitHub manifest callback, webhook verify.
 apps/worker            AGPL   worker process. M0: GET /healthz only.
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLI.
-packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange.
+packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.
 packages/git-write      AGPL   blobless mirror, commit from a temporary index, push to oxybook/*.
 corpus/manifest.json          pinned doc repos (SHA + sparse path).
 corpus/fixtures               adversarial markdown, committed.
@@ -81,4 +82,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- MVP.md's M0 checklist is larger than the code. Do not mark M0 done. The remaining exit blocker is a real pull request against a test repo. The schema and a live GitHub App install are still open and are not that exit sentence. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md`: an unsigned push is rejected, and the Git Database API fast-forward from this environment's installation token was accepted. `STATUS.md` is the list of what is still unverified.
+- MVP.md's M0 checklist is larger than the code. Do not mark M0 done on a unit test. The remaining exit blocker is a real pull request against a test repo. Opening that pull request is unit-tested only. The schema and a live GitHub App install are still open and are not that exit sentence. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md`: an unsigned push is rejected, and the Git Database API fast-forward from this environment's installation token was accepted. `STATUS.md` is the list of what is still unverified.

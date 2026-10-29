@@ -106,6 +106,6 @@ Before this session the branch head was `d284359f4d12f13bb17db60c7cd8fd0e9cf5027
 
 **Live webhook delivery.** Signature checks use a fixture. GitHub has not posted a webhook at this process.
 
-**Opening a pull request on GitHub.** The CLI pushes to a `file://` remote. It does not call `POST /repos/{owner}/{repo}/pulls`. A GitHub pull request was not opened.
+**Opening a pull request on GitHub.** This spike's CLI run pushed to a `file://` remote and did not call the pulls API. `oxybook-dev propose` can now `POST /repos/{owner}/{repo}/pulls` after the push when `--github-owner` is set. That POST is unit-tested against a fake `fetch` and the installation-token cache. It has not been called on `api.github.com`. A live App install has not happened. See `docs/LIVE-INSTALL.md`.
 
 **Installation tokens against `api.github.com`.** The cache was tested with a fake HTTP response, not a real GitHub App. The ruleset probe above did use a real installation token for the Git Database calls. That does not exercise the cache.
