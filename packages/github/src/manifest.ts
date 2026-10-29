@@ -2,7 +2,9 @@
 
 /**
  * Permissions from ARCHITECTURE §4.1. Workflows is intentionally absent.
- * Events: push, pull_request, installation, installation_repositories.
+ * default_events is push and pull_request only. GitHub rejects installation
+ * and installation_repositories in that list and delivers those events itself
+ * when the App has a webhook.
  */
 export interface AppManifestInput {
   name: string;
@@ -25,7 +27,7 @@ export interface AppManifest {
     pull_requests: 'write';
     metadata: 'read';
   };
-  default_events: ['push', 'pull_request', 'installation', 'installation_repositories'];
+  default_events: ['push', 'pull_request'];
   description?: string;
 }
 
@@ -42,7 +44,7 @@ export function buildAppManifest(input: AppManifestInput): AppManifest {
       pull_requests: 'write',
       metadata: 'read',
     },
-    default_events: ['push', 'pull_request', 'installation', 'installation_repositories'],
+    default_events: ['push', 'pull_request'],
     ...(input.description ? { description: input.description } : {}),
   };
 }

@@ -27,12 +27,10 @@ describe('app manifest', () => {
       metadata: 'read',
     });
     assert.equal('workflows' in manifest.default_permissions, false);
-    assert.deepEqual(manifest.default_events, [
-      'push',
-      'pull_request',
-      'installation',
-      'installation_repositories',
-    ]);
+    assert.deepEqual(manifest.default_events, ['push', 'pull_request']);
+    const events: readonly string[] = manifest.default_events;
+    assert.equal(events.includes('installation'), false);
+    assert.equal(events.includes('installation_repositories'), false);
     assert.equal(manifest.hook_attributes.active, true);
     assert.equal(manifest.public, false);
     assert.equal(manifestCreateUrl({ kind: 'user' }), 'https://github.com/settings/apps/new');
