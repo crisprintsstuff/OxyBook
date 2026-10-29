@@ -2,12 +2,14 @@
 
 Future agents: append a dated entry under Changelog when something meaningful lands or a measured fact changes. Do not silently rewrite or delete older entries. Do update the current-state block and the milestone table so they match the latest entry. If you did not run it, write "unverified". Do not invent metrics.
 
+Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current state`. A head SHA in the current-state block is stale as soon as the next PR merges. Name the current head only in changelog entries.
+
 ## Current state
 
 - **Milestone:** M0, in progress. Not done.
 - **Last update:** 2026-10-29.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
-- **CI:** `main` is `4837c97c7e546e80b31b265d67e24c70ae910939`. Push run [40898410005](https://github.com/crisprintsstuff/OxyBook/actions/runs/40898410005) succeeded. The `check` job ran 2026-10-29T15:07:55Z–15:08:27Z (32s). `.github/workflows/ci.yml` runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:corpus`. That corpus step fetches the pinned corpus repos, so the job needs network. History, not this head: PR #4 at `b6318ec9` had successful `pull_request` run [40898205659](https://github.com/crisprintsstuff/OxyBook/actions/runs/40898205659) and `push` run [40898195014](https://github.com/crisprintsstuff/OxyBook/actions/runs/40898195014). Earlier still: `99fe76f` push [40836564769](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836564769) (job 07:37:00Z–07:37:31Z, 31s) and pull_request [40836572202](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836572202) (job 07:37:03Z–07:37:29Z, 26s); merge `d942fb2` push [40836670051](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836670051) (job 07:37:57Z–07:38:20Z, 23s).
+- **CI:** `check` is green on the latest push to `main`. The workflow is `.github/workflows/ci.yml`. It runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:corpus`. The corpus step fetches the pinned repos, so the job needs network. The current head and its result are on the repo's Actions tab.
 - **Docker:** `docker compose up -d --build` built `localhost/oxybook:dev` (engine 29.1.3, Compose 2.40.3). postgres, caddy, mailpit, app, and worker all reported healthy. From inside the containers, `GET /healthz` returned 200 `{"ok":true,"service":"app"}` on port 3000 and 200 `{"ok":true,"service":"worker"}` on port 3001. The image's git is 2.39.5. The stack was then removed with `docker compose down --remove-orphans -v`.
 - **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. An unsigned `git push` to `ruleset-probe-test` was rejected by ruleset `26114519` (`GH013`, commits must have verified signatures). A fast-forward `PATCH /git/refs/heads/ruleset-probe-test` of a Git Database API commit returned HTTP 200; GitHub had signed that commit (`verification.verified: true`, `reason: "valid"`). The measured head was `c915f0780c13f25cdf01870fcda216b721c576cf`. Details are in `docs/M0-GITHUB-SPIKE.md`.
 - **Signed-commit note:** The note `docs/MVP.md` asks for exists: `docs/M0-GITHUB-SPIKE.md`. It concludes that `required_signatures` rejects an unsigned `git push` (`GH013`) and accepts a GitHub-signed Git Database API fast-forward (HTTP 200, `verification.verified: true`, `reason: "valid"`).
@@ -41,6 +43,10 @@ Exit, from that sentence:
 2. **Live GitHub App.** Manifest JSON and the callback route are unit-tested against a fake `fetch`. A real app was not created (that needs a public callback URL and a human approving the manifest). Webhook delivery from GitHub is unverified. `POST /repos/{owner}/{repo}/pulls` was not called. See `docs/M0-GITHUB-SPIKE.md`.
 
 ## Changelog
+
+### 2026-10-29 — Current state no longer pins a head SHA
+
+The entry below pinned `main` at `4837c97c7e546e80b31b265d67e24c70ae910939`. That head has since moved. This entry supersedes that pin by taking the head SHA, the run ids, and the history sentence out of `## Current state`. Commit SHAs and CI run ids stay in changelog entries. `main` at the time of writing is `84482b02fb533c41f305eb8fc36a68936bf6d9ac`. `check` on that push was green, 2026-10-29T15:14:35Z–15:15:02Z. The entry below is left as written.
 
 ### 2026-10-29 — Status handoff matches `main` after the probe was removed
 
