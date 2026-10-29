@@ -6,15 +6,16 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0, in progress. Not done.
+- **Milestone:** M0 complete, M1 not started.
 - **Last update:** 2026-10-29.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
 - **Dev server:** `pnpm dev` prints `app listening on 3000` and `worker listening on 3001`. `GET /healthz` on those ports returned 200 `{"ok":true,"service":"app"}` and 200 `{"ok":true,"service":"worker"}`. The processes were then stopped. The app script builds `@oxybook/github` and runs `tsx watch`.
 - **CI:** `check` is green on the latest push to `main`. The workflow is `.github/workflows/ci.yml`. It runs `pnpm lint`, `pnpm typecheck`, `pnpm test`, and `pnpm test:corpus`. The corpus step fetches the pinned repos, so the job needs network. The current head and its result are on the repo's Actions tab.
 - **Docker:** `docker compose up -d --build` built `localhost/oxybook:dev` (engine 29.1.3, Compose 2.40.3). postgres, caddy, mailpit, app, and worker all reported healthy. From inside the containers, `GET /healthz` returned 200 `{"ok":true,"service":"app"}` on port 3000 and 200 `{"ok":true,"service":"worker"}` on port 3001. The image's git is 2.39.5. The stack was then removed with `docker compose down --remove-orphans -v`.
-- **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. An unsigned `git push` to `ruleset-probe-test` was rejected by ruleset `26114519` (`GH013`, commits must have verified signatures). A fast-forward `PATCH /git/refs/heads/ruleset-probe-test` of a Git Database API commit returned HTTP 200; GitHub had signed that commit (`verification.verified: true`, `reason: "valid"`). The measured head was `c915f0780c13f25cdf01870fcda216b721c576cf`. Details are in `docs/M0-GITHUB-SPIKE.md`. With `--github-owner`, the same command POSTs `/repos/{owner}/{repo}/pulls` after the push, using an installation token from `InstallationTokenCache`, and prints the pull request URL. That POST is unit-tested against a fake `fetch`. It has not been called on `api.github.com`.
-- **Signed-commit note:** The note `docs/MVP.md` asks for exists: `docs/M0-GITHUB-SPIKE.md`. It concludes that `required_signatures` rejects an unsigned `git push` (`GH013`) and accepts a GitHub-signed Git Database API fast-forward (HTTP 200, `verification.verified: true`, `reason: "valid"`).
-- **What does not:** There is no editor, renderer, database, or published site. A GitHub App has not been installed on a real account, and no GitHub pull request has been opened by OxyBook. The owner checklist for that install is `docs/LIVE-INSTALL.md`. The manifest's `callback_urls` entry is `${publicUrl}/api/github/oauth/callback`, and no route serves that path. The callback the server serves is `GET /setup/github/callback`. There is no environment variable for the installation id. The CLI takes `--installation-id`. `pnpm db:migrate`, `pnpm test:integration`, and `pnpm test:e2e` are not implemented. Probe scaffolding (ruleset `ruleset-probe`, id `26114519`, and branch `ruleset-probe-test`) was removed on 2026-10-29 after the measurement was recorded, the ruleset first and then the branch, because the ruleset's own `deletion` rule blocks removing a matching branch while it is active. Removing them changed nothing about the measurement. See "M0 still open".
+- **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. An unsigned `git push` to `ruleset-probe-test` was rejected by ruleset `26114519` (`GH013`, commits must have verified signatures). A fast-forward `PATCH /git/refs/heads/ruleset-probe-test` of a Git Database API commit returned HTTP 200; GitHub had signed that commit (`verification.verified: true`, `reason: "valid"`). The measured head was `c915f0780c13f25cdf01870fcda216b721c576cf`. Details are in `docs/M0-GITHUB-SPIKE.md`. The same command has since opened a pull request on GitHub. See "Live pull request".
+- **Live pull request:** [crisprintsstuff/oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is open, not merged, on the public repo [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxybook-test) (default branch `main`). Title `Update docs/test-page.md`. Head branch `oxybook/dev/page-1`. Author is the GitHub App bot `oxybook-dev-cb[bot]`, App id 5530818, installation id 176643684. `GET /repos/crisprintsstuff/oxybook-test/pulls/1/files` returned exactly one entry: `docs/test-page.md`, added, +3/-0. The body contained `Pages changed: docs/test-page.md` and `Link back: https://oxybook.boznetwork.com`. The command was `pnpm oxybook-dev propose <file> --remote https://github.com/crisprintsstuff/oxybook-test.git --github-owner crisprintsstuff --github-repo oxybook-test --installation-id 176643684 --base main --path docs/test-page.md`, with `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY_FILE` set. It exited 0 and printed the commit, the ref, the base, the author, `pr <url>`, and the diff. The App was created by hand at `https://github.com/settings/apps/new`, not through `/setup/github`. The run was Node v22.23.1, not 24. pnpm printed an Unsupported engine warning and the command succeeded. That is a known deviation, not evidence that Node 22 is supported.
+- **Signed-commit note:** The note `docs/MVP.md` asks for exists: `docs/M0-GITHUB-SPIKE.md`. It concludes that `required_signatures` rejects an unsigned `git push` (`GH013`) and accepts a GitHub-signed Git Database API fast-forward (HTTP 200, `verification.verified: true`, `reason: "valid"`). That measurement was on this repo. It was not repeated on `oxybook-test`, and `oxybook-test` has no ruleset.
+- **What does not:** There is no editor, renderer, database, or published site. The manifest flow (`/setup/github`) is unverified: the App above was created by hand. Webhook delivery from GitHub to `/api/github/webhooks` is unverified. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. The manifest `callback_urls` entry is `${publicUrl}/api/github/oauth/callback`, and no route serves that path. The callback the server serves is `GET /setup/github/callback`. There is no environment variable for the installation id. The CLI takes `--installation-id`. `pnpm db:migrate`, `pnpm test:integration`, and `pnpm test:e2e` are not implemented. Database schema v0 is not started. See "M0 exit, met".
 
 ## Milestones
 
@@ -22,28 +23,65 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 
 | Milestone | Status |
 | --- | --- |
-| M0 — Foundations and risk spikes | in progress |
+| M0 — Foundations and risk spikes | complete |
 | M1 — Read path and published site | not started |
 | M2 — Editor and write path | not started |
 | M3 — Conflicts, versions, renames | not started |
 | M4 — Production readiness, v1.0 | not started |
 
-## M0 still open
+## M0 exit, met
 
-`docs/MVP.md` says M0 is done when corpus identity runs in CI, the CLI opens a real pull request against a test repo whose diff is only the intended change, and a written note records the signed-commit ruleset behaviour. That is the exit sentence. Two of the three are met. The third is not, so M0 stays in progress.
+`docs/MVP.md` says M0 is done when corpus identity is 100% on parseable files and runs in CI; the CLI opens a real PR against a test repo whose diff contains only the intended change; a written note records the signed-commit ruleset behaviour (ARCHITECTURE §4.3).
 
-Exit, from that sentence:
+1. **Corpus identity in CI.** Met. `.github/workflows/ci.yml` runs `pnpm test:corpus`. The measured result recorded above is 594 pass, 0 fail, 1 unparseable.
+2. **Real pull request.** Met. [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1). `GET /repos/crisprintsstuff/oxybook-test/pulls/1/files` returned exactly one entry, `docs/test-page.md`, added, +3/-0.
+3. **Written note.** Met. `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour.
 
-1. **Corpus identity in CI.** Met. `.github/workflows/ci.yml` runs `pnpm test:corpus`.
-2. **Written note.** Met. `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour. See "Signed-commit note" above.
-3. **Real pull request.** Not met. This is the remaining M0 exit blocker. `oxybook-dev propose` can POST a pull request after the push. That call is unit-tested against a fake `fetch`. It has not been run against a test repo on GitHub. A live App install has not happened. See `docs/LIVE-INSTALL.md`.
+Still unverified. These are not the exit sentence, and they are not done:
 
-`docs/MVP.md` also lists M0 work that is not part of that exit sentence. Still open, and not the exit blocker:
+- **Manifest-created App.** Unverified. The App that opened the pull request was created by hand at `https://github.com/settings/apps/new`. `/setup/github` has not been proven end to end.
+- **Webhook delivery** from GitHub to `/api/github/webhooks` in production. Unverified.
+- **Git Database API fallback** on a repo whose ruleset requires signed commits. Unverified on `oxybook-test`. That repo has no ruleset. The earlier measurement was on this repo. See `docs/M0-GITHUB-SPIKE.md`.
+- **Database schema v0 and migrations** (Kysely + SQL migrations). Not started. Unverified. `pnpm db:migrate` is not a script. Listed as M0 work in `docs/MVP.md` and not part of the exit sentence.
+- **OAuth callback path.** The manifest `callback_urls` value is `/api/github/oauth/callback`. No route serves it. The served callback is `GET /setup/github/callback`.
+- **Installation id.** No environment variable. The CLI flag is `--installation-id`.
+- **`pnpm test:integration` and `pnpm test:e2e`.** Not implemented.
+- **Editor, renderer, database, and published site.** Not started.
 
-1. **Database schema v0 and migrations** (Kysely + SQL migrations). Not started. Unverified. `pnpm db:migrate` is not a script.
-2. **Live GitHub App.** Manifest JSON, the callback route, and `POST /repos/{owner}/{repo}/pulls` are unit-tested against a fake `fetch`. A live attempt to create an App from `/setup/github` was rejected by GitHub while `default_events` included `installation` and `installation_repositories`. Those two names are no longer in the manifest. That manifest has not been submitted to GitHub again, so acceptance is unverified. Webhook delivery from GitHub is unverified. The pulls POST has not been called on `api.github.com`. The owner checklist is `docs/LIVE-INSTALL.md`. See `docs/M0-GITHUB-SPIKE.md`.
+## M1 next
+
+Not started. No M1 code is in the tree. From `docs/MVP.md`:
+
+- Accounts (email/password, sessions), organisations, spaces, Admin role.
+- GitHub App install flow in the UI; repo connection with access check; webhook sync + reconciliation; read model in PostgreSQL.
+- Renderer: mdast→hast handlers, allowlisted components (Callout, Tabs/TabItem, Card, CodeGroup to start; final list from the H3 report), Shiki, link rewriting and broken-link warnings, import mapping.
+- Build job, release assembly with hardlinks, atomic swap; `by-host` symlinks; Caddy serving `<space>.docs.localhost` in dev.
+- Default theme v0, sidebar from tree + `_dir.yml`, Pagefind.
+- `oxybook check` compatibility CLI; corpus rendering report.
+
+**Done when:** connecting a test repo yields a published site with working nav and search; a push to the default branch (including a rename and a delete) is reflected on the site with no manual step; a dropped webhook is caught by reconciliation; stopping `app` does not take the published site down.
 
 ## Changelog
+
+### 2026-10-29 — M0 complete: a real pull request
+
+Test repo [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxybook-test), public, default branch `main`.
+
+[Pull request 1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is open, not merged. Title `Update docs/test-page.md`. Head branch `oxybook/dev/page-1` at commit `4fa776d44aaa8342dd3c506ee47c54289b019991`. Base `main` (`02d62aba`). Author is the GitHub App bot, login `oxybook-dev-cb[bot]`, App id 5530818, installation id 176643684.
+
+The diff is exactly one file, `docs/test-page.md`, added, +3/-0. `GET /repos/crisprintsstuff/oxybook-test/pulls/1/files` returned exactly 1 entry. That is the M0 exit requirement that the diff contain only the intended change.
+
+The pull request body contained `Pages changed: docs/test-page.md` and `Link back: https://oxybook.boznetwork.com`.
+
+The command was `pnpm oxybook-dev propose <file> --remote https://github.com/crisprintsstuff/oxybook-test.git --github-owner crisprintsstuff --github-repo oxybook-test --installation-id 176643684 --base main --path docs/test-page.md`, with `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY_FILE` set. It exited 0 and printed the commit, the ref, the base, the author, `pr <url>`, and the diff.
+
+The App was created by hand at `https://github.com/settings/apps/new`, not through `/setup/github`, because the manifest flow was rejected. That fix is PR #9, merged as `86ccb01aa93c8a65c4b5db40093c1476ddf3da6a`. The manifest flow itself is still not proven end to end.
+
+The run was Node v22.23.1, not 24. pnpm printed an Unsupported engine warning. The command succeeded anyway. That is a known deviation, not evidence that Node 22 is supported.
+
+Still unverified: webhook delivery from GitHub to `/api/github/webhooks` in production; the manifest-created App path; the Git Database API fallback against a repo whose ruleset requires signed commits (measured earlier on this repo, not on `oxybook-test`, and `oxybook-test` has no ruleset); the editor, the renderer, the database, and a published site.
+
+The entry below that says no GitHub pull request had been opened was true when it was written.
 
 ### 2026-10-29 — `pnpm oxybook-dev -- propose` was opening a file named propose
 
