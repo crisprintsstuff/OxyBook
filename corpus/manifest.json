@@ -1,0 +1,39 @@
+{
+  "repos": [
+    {
+      "name": "docusaurus",
+      "stack": "Docusaurus",
+      "url": "https://github.com/facebook/docusaurus.git",
+      "sha": "4e6fe61666a521d35d328ec0561d84eb96609017",
+      "paths": ["website/docs"]
+    },
+    {
+      "name": "starlight",
+      "stack": "Starlight",
+      "url": "https://github.com/withastro/starlight.git",
+      "sha": "f1e9fa5ad4fbebd12caecebf1cad060349ef020e",
+      "paths": ["docs/src/content/docs"]
+    },
+    {
+      "name": "vitepress",
+      "stack": "VitePress",
+      "url": "https://github.com/vuejs/vitepress.git",
+      "sha": "415a6a39507af37e282c02eb57ca50594f1bc237",
+      "paths": ["docs/en"]
+    },
+    {
+      "name": "mkdocs",
+      "stack": "MkDocs",
+      "url": "https://github.com/mkdocs/mkdocs.git",
+      "sha": "2862536793b3c67d9d83c33e0dd6d50a791928f8",
+      "paths": ["docs"]
+    },
+    {
+      "name": "mkdocs-material",
+      "stack": "MkDocs",
+      "url": "https://github.com/squidfunk/mkdocs-material.git",
+      "sha": "0f044dbe83cd52c8bcc4cf1e84536dcf9e16cdb3",
+      "paths": ["docs"]
+    }
+  ]
+}
