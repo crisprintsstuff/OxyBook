@@ -7,8 +7,9 @@ Future agents: append a dated entry under Changelog when something meaningful la
 - **Milestone:** M0, in progress. Not done.
 - **Last update:** 2026-10-29.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits.
-- **CI:** The first `check` runs failed in a few seconds with zero steps because Actions billing blocked the job (annotation on runs 40835691209 and 40835716025). Those runs were later re-run successfully. `check` on `d9e725c` (run 40836479834) completed green: install, lint, typecheck, test, and corpus.
-- **What does not:** There is no editor, renderer, database, GitHub App, or published site. Opening a page, proposing a PR, and serving docs are not implemented. The Docker image has not been built or started (Docker was unavailable; unverified). This is pre-product infrastructure.
+- **CI:** On `99fe76f`, both `check` runs succeeded: push [40836564769](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836564769) (job 07:37:00Z–07:37:31Z, 31s) and pull_request [40836572202](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836572202) (job 07:37:03Z–07:37:29Z, 26s). Merge commit `d942fb2` push run [40836670051](https://github.com/crisprintsstuff/OxyBook/actions/runs/40836670051) succeeded (job 07:37:57Z–07:38:20Z, 23s). An earlier current-state line named `d9e725c` / run 40836479834; that run did succeed, and these later SHAs did too.
+- **Docker:** `docker compose up -d --build` built `localhost/oxybook:dev` (engine 29.1.3, Compose 2.40.3). postgres, caddy, mailpit, app, and worker all reported healthy. From inside the containers, `GET /healthz` returned 200 `{"ok":true,"service":"app"}` on port 3000 and 200 `{"ok":true,"service":"worker"}` on port 3001. The image's git is 2.39.5. The stack was then removed with `docker compose down --remove-orphans -v`.
+- **What does not:** There is no editor, renderer, database, GitHub App, or published site. M0's exit in `docs/MVP.md` is not met. The open items are listed under "M0 still open".
 
 ## Milestones
 
@@ -22,7 +23,23 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | M3 — Conflicts, versions, renames | not started |
 | M4 — Production readiness, v1.0 | not started |
 
+## M0 still open
+
+`docs/MVP.md` marks M0 done when corpus identity runs in CI, a CLI opens a real pull request whose diff is only the intended change, and a note records signed-commit ruleset behaviour. The identity half is in the tree and has a green `check` on `main`. These are not:
+
+1. **Database schema v0 and migrations** (Kysely + SQL migrations, `pnpm db:migrate`). Not started. Unverified.
+2. **GitHub App spike.** App Manifest flow creates an app; a webhook is received and verified; a blobless mirror is fetched; a tree is built and pushed to `oxybook/*`; `oxybook-dev propose` opens a pull request. Not started. Unverified.
+3. **Signed-commit rulesets (ARCHITECTURE §4.3).** Whether a ruleset that requires signed commits on `oxybook/*` rejects an unsigned push, and whether the Git Database API is a working fallback. Unverified. Do not assume either outcome.
+
 ## Changelog
+
+### 2026-10-29 — PR #1 merged; CI head corrected; image health checked
+
+PR #1 merged as `d942fb2747b9f1cb1d708af884ebfdb6a376a858`.
+
+`check` on `99fe76f` succeeded twice: push run 40836564769, job 07:37:00Z–07:37:31Z (31s), and pull_request run 40836572202, job 07:37:03Z–07:37:29Z (26s). Merge push run 40836670051 on `d942fb2` succeeded, job 07:37:57Z–07:38:20Z (23s). The changelog entry below that names `d9e725c` was already behind those SHAs when `main` moved; it is left as written.
+
+Docker was not installed here at the start of this check. After installing docker.io 29.1.3 and starting `dockerd` by hand (the service manager would not), `docker compose up -d --build` produced `localhost/oxybook:dev`. Inside the containers, app `GET http://127.0.0.1:3000/healthz` returned `200 {"ok":true,"service":"app"}` and worker `GET http://127.0.0.1:3001/healthz` returned `200 {"ok":true,"service":"worker"}`. postgres, caddy, mailpit, app, and worker all reported healthy. The stack was removed with `docker compose down --remove-orphans -v`.
 
 ### 2026-10-29 — `check` is green on `d9e725c`
 
