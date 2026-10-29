@@ -52,6 +52,52 @@ cloudflared tunnel run <tunnel-name>
 
 Set `OXYBOOK_PUBLIC_URL` to `https://<your stable hostname>`.
 
+## A second tunnel next to an existing one
+
+Use this when a Cloudflare Tunnel is already running for something else. Create another tunnel in the Zero Trust dashboard. Do not edit the existing tunnel, and do not add this hostname to its routes.
+
+Current docs call the path **Networking > Tunnels** in the dashboard at `https://one.dash.cloudflare.com` ([Create a tunnel (dashboard)](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/get-started/create-remote-tunnel/)).
+
+1. Go to **Networking > Tunnels**.
+2. Select **Create a tunnel**. Enter a name that is not the existing tunnel's name. Select **Create Tunnel**.
+3. The next screen shows an install command. The token in that command is the `eyJ…` string. Copy the token. Do not run a command that reinstalls the existing tunnel's service.
+4. Open the new tunnel. On the **Routes** tab, select **Add route**, then **Published application**. That published application is the public hostname. Under **Hostname**, enter a subdomain and choose a domain you already control. Leave the existing tunnel's routes as they are.
+5. Set **Service URL** to `http://localhost:3000` (or `http://localhost:<PORT>` if you changed `PORT`). Select **Add route**.
+
+A dashboard tunnel does not use a credentials JSON or a local config file. Routes live on that tunnel in the dashboard. Isolation from the tunnel you already run is the new tunnel, its own token, and its own published hostname.
+
+Run it with the token. `--token` comes after `run` ([run parameters](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/)):
+
+```sh
+cloudflared tunnel run --token <token>
+```
+
+Two `cloudflared` processes can run at once. Each token selects its own tunnel. The existing process keeps the token it already has.
+
+If you already run `cloudflared` under systemd, the default unit name in Cloudflare's docs is `cloudflared.service`. Do not point that unit at the new token. Add a second unit whose `ExecStart` is the command above, for example `cloudflared-oxybook.service`:
+
+```ini
+[Unit]
+Description=cloudflared for OxyBook
+After=network.target
+
+[Service]
+TimeoutStartSec=0
+Type=notify
+ExecStart=/usr/local/bin/cloudflared tunnel run --token <token>
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+```
+
+The binary path is whatever `command -v cloudflared` prints on this machine. If you do not use systemd, start the same `cloudflared tunnel run --token <token>` command the way you already start the other tunnel: a second process, not a replacement.
+
+`sudo cloudflared service install <token>` is the install command in Cloudflare's get-started page. It writes `cloudflared.service`. Skip it when that unit is already the other tunnel.
+
+The published hostname stays until you change that route. Set `OXYBOOK_PUBLIC_URL` to `https://<that hostname>` once, with no path and no trailing slash. The quick `cloudflared tunnel --url` tunnel above is the throwaway alternative: its `trycloudflare.com` hostname changes every run.
+
 ## What the manifest will call
 
 With `OXYBOOK_PUBLIC_URL` set, `apps/server` builds one manifest. These paths are the ones in the code:
