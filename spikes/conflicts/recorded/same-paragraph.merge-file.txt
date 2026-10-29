@@ -1,0 +1,9 @@
+alpha
+
+<<<<<<< draft
+beta draft
+=======
+beta upstream
+>>>>>>> upstream
+
+gamma
