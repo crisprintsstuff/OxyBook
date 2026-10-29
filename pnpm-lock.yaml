@@ -22,6 +22,10 @@ importers:
         version: 7.0.2
 
   apps/server:
+    dependencies:
+      '@oxybook/github':
+        specifier: workspace:*
+        version: link:../../packages/github
     devDependencies:
       '@types/node':
         specifier: 26.6.6
@@ -84,6 +88,30 @@ importers:
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/git-write:
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/github:
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
       tsx:
         specifier: 4.23.15
         version: 4.23.15

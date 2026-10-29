@@ -14,6 +14,7 @@
     "format": "biome format --write .",
     "typecheck": "pnpm -r --if-present run typecheck && tsc -p spikes/conflicts/tsconfig.json --noEmit",
     "oxybook-roundtrip": "tsx packages/doc-model/src/cli.ts",
+    "oxybook-dev": "tsx packages/git-write/src/cli.ts",
     "dev": "pnpm --parallel --filter @oxybook/server --filter @oxybook/worker run dev"
   },
   "devDependencies": {

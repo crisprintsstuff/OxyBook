@@ -10,7 +10,8 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 2. `docs/ARCHITECTURE.md` — the technical design. Read all of it before touching `packages/doc-model` or anything that will become the sync layer.
 3. `docs/MVP.md` — v1 scope, the three hard problems (H1 round-trip, H2 conflicts, H3 rendering), and the milestone exits.
 4. `docs/M0-NOTES.md` — what the round-trip library actually guarantees, the measured corpus numbers, and where the design docs are wrong or thin.
-5. `STATUS.md` — what is in progress. That file is the status source of truth. Do not duplicate it here.
+5. `docs/M0-GITHUB-SPIKE.md` — which GitHub and git-write checks were run for real, and which are still fakes.
+6. `STATUS.md` — what is in progress. That file is the status source of truth. Do not duplicate it here.
 
 ## Hard constraints
 
@@ -23,14 +24,16 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is in progress, not finished. The round-trip library, the corpus harness, the conflict-merge spike, and `/healthz` skeletons exist. The database, the GitHub App, the editor, and the renderer do not. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is in progress, not finished. The round-trip library, the corpus harness, the conflict-merge spike, `/healthz`, and a GitHub write-path spike exist. The database, a live GitHub App install, the editor, and the renderer do not. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
 ```
-apps/server            AGPL   HTTP process. M0: GET /healthz only.
+apps/server            AGPL   HTTP process. /healthz, GitHub manifest callback, webhook verify.
 apps/worker            AGPL   worker process. M0: GET /healthz only.
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLI.
+packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange.
+packages/git-write      AGPL   blobless mirror, commit from a temporary index, push to oxybook/*.
 corpus/manifest.json          pinned doc repos (SHA + sparse path).
 corpus/fixtures               adversarial markdown, committed.
 corpus/cache                  fetched repos. Gitignored. Do not commit.
@@ -38,6 +41,7 @@ spikes/conflicts              H2 spike: git merge scenarios, recorded bytes, NOT
 deploy/oxybook                Apache  image entrypoint: `oxybook server|worker`.
 Dockerfile                    AGPL   multi-stage image the compose file builds.
 docs/M0-NOTES.md              measured results and design corrections.
+docs/M0-GITHUB-SPIKE.md       what the GitHub spike verified, and what it did not.
 ```
 
 `packages/renderer`, `packages/sdk`, `apps/editor`, and the database are in the architecture and are not in the tree.
@@ -54,6 +58,7 @@ pnpm lint
 pnpm typecheck
 pnpm build
 pnpm oxybook-roundtrip <file-or-directory>
+pnpm oxybook-dev -- propose <file> --remote file:///path/to/remote.git
 ```
 
 `oxybook-roundtrip` prints `PASS` / `FAIL` / `UNPARSEABLE` / `ERROR` per file. Exit code 1 means an identity failure or a crash. Unparseable is reported and does not fail the command. `pnpm test:corpus` prints a markdown table of every file and fails the test if any parseable file is not identical.
@@ -76,4 +81,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- MVP.md's M0 checklist is larger than the code. Do not mark M0 done. What is still open (schema and migrations, the GitHub App spike, and the signed-commit ruleset question in ARCHITECTURE §4.3) is listed in `STATUS.md`. Those items are unverified.
+- MVP.md's M0 checklist is larger than the code. Do not mark M0 done. The schema, a live GitHub App install, and the signed-commit ruleset question are still open. `STATUS.md` says which of those are unverified and why. `docs/M0-GITHUB-SPIKE.md` is the measurement note.
