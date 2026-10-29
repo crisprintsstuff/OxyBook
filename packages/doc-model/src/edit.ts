@@ -51,7 +51,9 @@ function collect(block: Block, node: MdastNode, doc: SourceDoc, spans: TextSpan[
         // Positions sometimes cover marker bytes the value does not (blockquote
         // continuations). Only spans whose bytes equal the text are editable
         // without inventing an escape.
-        if (slice === node.value) {
+        const marker =
+          block.type === 'callout' && (node.value.includes(':::') || slice.includes(':::'));
+        if (slice === node.value && !marker) {
           spans.push({ blockId: block.id, start, end, value: node.value });
         }
       }
@@ -119,6 +121,9 @@ export function insertIntoTextSpan(
 export function reformatBlock(doc: SourceDoc, blockId: string): SourceDoc {
   const block = blockById(doc, blockId);
   if (!block.editable || !block.mdast) throw new Error(`block ${block.id} cannot be reformatted`);
+  if (block.type === 'callout') {
+    throw new Error(`block ${block.id} is a callout; reformatting would rewrite its marker lines`);
+  }
   if (block.edits.length > 0) throw new Error(`block ${block.id} already has a text edit`);
   return replaceBlock(doc, { ...block, reformat: true });
 }

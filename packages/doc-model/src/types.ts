@@ -90,6 +90,11 @@ export interface Block {
    */
   reformat: boolean;
   mdast: MdastNode | null;
+  /** Set on a folded container (`:::name`, `:::name Title`, `:::name[Title]`). */
+  calloutName?: string;
+  calloutTitle?: string | null;
+  /** False when the closing `:::` was missing and the block runs through EOF. */
+  calloutClosed?: boolean;
 }
 
 export interface SourceDoc {

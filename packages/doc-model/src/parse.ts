@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMdx from 'remark-mdx';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
+import { foldCallouts } from './callouts.js';
 import { detectLineEnding, splitFrontmatter } from './frontmatter.js';
 import { inferStyle } from './style.js';
 import type {
@@ -180,6 +181,10 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
     cursor = end;
   }
 
+  const folded = foldCallouts(source, blocks, bodyStart);
+  const lastFolded = folded[folded.length - 1];
+  const foldedEnd = lastFolded ? lastFolded.end : bodyStart;
+
   const doc: SourceDoc = {
     bom,
     lineEnding: detectLineEnding(source),
@@ -187,10 +192,10 @@ export function parse(source: string, options: ParseOptions = {}): ParseResult {
     format,
     bodyStart,
     frontmatter: split.frontmatter,
-    blocks,
-    trailing: source.slice(cursor),
+    blocks: folded,
+    trailing: source.slice(foldedEnd),
     style: inferStyle(
-      blocks.flatMap((block) => (block.mdast ? [block.mdast] : [])),
+      folded.flatMap((block) => (block.mdast ? [block.mdast] : [])),
       body,
     ),
   };
