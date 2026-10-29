@@ -58,7 +58,7 @@ Not edited. Corrections live here.
 
 ## Docker
 
-`docker-compose.yml` now builds `Dockerfile` for `app` and `worker` (`oxybook server` / `oxybook worker`, `/healthz` on port 3000 and `HEALTH_PORT`). Docker was not installed in the environment that produced this note. The image has not been built or started here. Unverified. The README quickstart still says the image does not exist; that file was left unchanged on purpose. `/healthz` is covered by unit tests against the Node process, not against a container.
+`docker-compose.yml` builds `Dockerfile` for `app` and `worker` (`oxybook server` / `oxybook worker`, `/healthz` on port 3000 and `HEALTH_PORT`). On 2026-10-29, after this note was first written, `docker compose up -d --build` did start that image. Inside the containers, app `GET /healthz` returned `200 {"ok":true,"service":"app"}` and worker `GET /healthz` returned `200 {"ok":true,"service":"worker"}`. postgres, caddy, mailpit, app, and worker all reported healthy. The stack was then removed. The README quickstart still says the image does not exist; that file was left unchanged on purpose. Details are in `STATUS.md`.
 
 ## What M1 should pick up first
 

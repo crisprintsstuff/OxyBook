@@ -58,7 +58,7 @@ pnpm oxybook-roundtrip <file-or-directory>
 
 `oxybook-roundtrip` prints `PASS` / `FAIL` / `UNPARSEABLE` / `ERROR` per file. Exit code 1 means an identity failure or a crash. Unparseable is reported and does not fail the command. `pnpm test:corpus` prints a markdown table of every file and fails the test if any parseable file is not identical.
 
-`pnpm dev` starts the app and worker health servers on the host (`PORT` 3000, `HEALTH_PORT` 3001). `docker compose up` is supposed to build the same image. That container path is unverified until someone with Docker runs it; see `docs/M0-NOTES.md`.
+`pnpm dev` starts the app and worker health servers on the host (`PORT` 3000, `HEALTH_PORT` 3001). `docker compose up --build` builds the same image. The measured container result (app and worker `/healthz`) is in `STATUS.md`, not repeated here.
 
 ## Conventions
 
@@ -75,5 +75,5 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - Green identity does not mean a construct is editable. JSX, HTML, and unknown directives are raw slices. `:::name Title` is one callout block; nested containers live inside that block, and reformatting a callout is refused so the marker lines stay byte-exact.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
-- The README still describes `app` and `worker` as a missing image. Compose now points at `Dockerfile`. The image has not been run in the environment that wrote these notes.
-- MVP.md's M0 checklist is larger than the code. Do not mark M0 done in `STATUS.md` until the GitHub spike and the schema are real, and until the signed-commit ruleset question in ARCHITECTURE §4.3 has a measured answer rather than an assumption.
+- The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
+- MVP.md's M0 checklist is larger than the code. Do not mark M0 done. What is still open (schema and migrations, the GitHub App spike, and the signed-commit ruleset question in ARCHITECTURE §4.3) is listed in `STATUS.md`. Those items are unverified.
