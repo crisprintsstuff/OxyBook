@@ -116,9 +116,7 @@ With `OXYBOOK_PUBLIC_URL` set, `apps/server` builds one manifest. These paths ar
 
 The running server supports the manifest flow only. `startAppServer` sets the owner to `{ kind: 'user' }`, so the form posts to the user settings URL. `manifestCreateUrl` can build `https://github.com/organizations/<org>/settings/apps/new`, and the running server never calls it that way.
 
-Opening `https://github.com/settings/apps/new` yourself and filling the form by hand is the manual route. Nothing in `apps/server` does that.
-
-1. Export `OXYBOOK_PUBLIC_URL=https://<hostname>` and start `pnpm dev`. Confirm the process is listening on port 3000 (or your `PORT`).
+1. Export `OXYBOOK_PUBLIC_URL=https://<hostname>` and start `pnpm dev`. The server dev script builds `@oxybook/github` first, because `github-routes.ts` imports that package from its `dist` output. Confirm the process prints `app listening on 3000` (or your `PORT`).
 2. In a browser, open `https://<hostname>/setup/github` (or `http://localhost:3000/setup/github` while the tunnel is up; both hit the same route). You must be logged into GitHub in that browser.
 3. The page is one form. The button label is **Create GitHub App**. Submitting it POSTs the manifest to `https://github.com/settings/apps/new?state=<hex>`. The state lasts 15 minutes. The hidden field name is `manifest`.
 4. On GitHub's page, review the permissions (contents write, pull requests write, metadata read; no workflows) and click **Create GitHub App**.
@@ -131,6 +129,18 @@ A successful callback is HTTP 200 and a JSON body:
 ```
 
 `id` is the App id. `slug` is the App's URL slug. The body has no private key, no client secret, and no webhook secret. Reusing the same `state` returns HTTP 400 and the text `invalid manifest callback`. A failed exchange returns HTTP 502.
+
+## Create the App by hand
+
+Use this when `/setup/github` is rejected. A manifest whose `default_events` included `installation` and `installation_repositories` was rejected with "Default events unsupported: installation and installation_repositories." The manifest in this tree lists `push` and `pull_request` only. That new manifest has not been submitted to GitHub. Nothing in `apps/server` fills the manual form.
+
+Go to `https://github.com/settings/apps/new` while logged in. Set:
+
+- **Webhook URL** to `https://<hostname>/api/github/webhooks`. `<hostname>` is `OXYBOOK_PUBLIC_URL` with no path.
+- Repository permissions: **Contents** read and write, **Pull requests** read and write, **Metadata** read. Do not grant Workflows.
+- Subscribe to **Push** and **Pull request**.
+
+After GitHub creates the App, the settings page at `https://github.com/settings/apps/<slug>` shows **App ID**. That value is `GITHUB_APP_ID`. Under **Private keys**, **Generate a private key** downloads a `.pem`. That file is `GITHUB_APP_PRIVATE_KEY_FILE`. The server does not read either variable. `oxybook-dev propose` does, when you pass `--github-owner`.
 
 ## Where the credentials go
 

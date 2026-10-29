@@ -64,7 +64,7 @@ pnpm oxybook-dev -- propose <file> --remote file:///path/to/remote.git
 
 `oxybook-roundtrip` prints `PASS` / `FAIL` / `UNPARSEABLE` / `ERROR` per file. Exit code 1 means an identity failure or a crash. Unparseable is reported and does not fail the command. `pnpm test:corpus` prints a markdown table of every file and fails the test if any parseable file is not identical.
 
-`pnpm dev` starts the app and worker health servers on the host (`PORT` 3000, `HEALTH_PORT` 3001). `docker compose up --build` builds the same image. The measured container result (app and worker `/healthz`) is in `STATUS.md`, not repeated here.
+`pnpm dev` starts the app and worker health servers on the host (`PORT` 3000, `HEALTH_PORT` 3001). The app script builds `@oxybook/github` and then runs `tsx watch`, because `apps/server` imports that package from `dist` and the source is TypeScript. `pnpm db:migrate`, `pnpm test:integration`, and `pnpm test:e2e` are not scripts in this tree. `docker compose up --build` builds the same image. The measured container result (app and worker `/healthz`) is in `STATUS.md`, not repeated here.
 
 ## Conventions
 
