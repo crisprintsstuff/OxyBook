@@ -1,0 +1,183 @@
+# OxyBook local development stack.
+#
+# Services and their roles are defined in docs/ARCHITECTURE.md §8:
+#   postgres  state, read-model cache, drafts, job queue (pg-boss), app full-text search
+#   app       API, editor SPA, auth, GitHub webhooks, Caddy ask/forward_auth endpoints
+#   worker    git mirrors, sync, propose (branch/commit/PR), static builds, Pagefind
+#   caddy     edge: serves built sites from the shared volume, proxies the app
+#   mailpit   dev-only SMTP sink with a web UI (http://localhost:8025)
+#   webhook-relay  optional (profile "webhooks"): forwards GitHub webhooks from a
+#                  smee.io channel to the app, since GitHub cannot reach localhost
+#
+# Usage:
+#   cp .env.example .env            # then fill in values; see comments there
+#   docker compose up -d            # core stack
+#   docker compose --profile webhooks up -d   # plus webhook relay
+#
+# URLs (browsers resolve *.localhost to loopback):
+#   editor/app      http://app.localhost:8080
+#   published site  http://<space-slug>.docs.localhost:8080
+#   mail            http://localhost:8025
+
+name: oxybook
+
+x-oxybook-env: &oxybook-env
+  # Postgres connection; matches the postgres service below.
+  DATABASE_URL: postgres://oxybook:${POSTGRES_PASSWORD:-oxybook-dev}@postgres:5432/oxybook
+  # Public base URL of the editor/app (used in links, OAuth callbacks, PR bodies).
+  OXYBOOK_PUBLIC_URL: ${OXYBOOK_PUBLIC_URL:-http://app.localhost:8080}
+  # Hostname suffix for platform-hosted sites: <space>.<suffix>.
+  OXYBOOK_SITES_DOMAIN: ${OXYBOOK_SITES_DOMAIN:-docs.localhost}
+  # Secret for signing session cookies and one-time codes. Must be set outside dev.
+  OXYBOOK_SECRET_KEY: ${OXYBOOK_SECRET_KEY:-dev-only-insecure-change-me}
+  # GitHub App credentials. Leave empty on first start: the app's setup screen
+  # creates a GitHub App via the App Manifest flow and stores them for you.
+  GITHUB_APP_ID: ${GITHUB_APP_ID:-}
+  GITHUB_APP_PRIVATE_KEY_FILE: ${GITHUB_APP_PRIVATE_KEY_FILE:-}
+  GITHUB_APP_WEBHOOK_SECRET: ${GITHUB_APP_WEBHOOK_SECRET:-}
+  GITHUB_APP_CLIENT_ID: ${GITHUB_APP_CLIENT_ID:-}
+  GITHUB_APP_CLIENT_SECRET: ${GITHUB_APP_CLIENT_SECRET:-}
+  # SMTP for invites and password reset (optional). Points at mailpit in dev.
+  SMTP_URL: ${SMTP_URL:-smtp://mailpit:1025}
+  SMTP_FROM: ${SMTP_FROM:-}
+  # Shared paths (see volumes).
+  OXYBOOK_SITES_DIR: /srv/sites
+  OXYBOOK_MIRRORS_DIR: /var/lib/oxybook/mirrors
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: oxybook
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-oxybook-dev}
+      POSTGRES_DB: oxybook
+    volumes:
+      # Back this volume up: accounts, memberships and unproposed drafts live here.
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      # Exposed on loopback only, for local tooling (psql, migrations from the host).
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oxybook -d oxybook"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    # PLACEHOLDER: OxyBook's own image does not exist yet. It will be built from
+    # the repository's Dockerfile (Node.js 24 on Debian bookworm, git >= 2.38).
+    # Until then, `docker compose up` starts the infrastructure services and these
+    # two services fail to pull. Override with OXYBOOK_IMAGE once an image exists.
+    image: ${OXYBOOK_IMAGE:-localhost/oxybook:dev}
+    # build:
+    #   context: .
+    #   target: dev
+    command: ["oxybook", "server"]        # placeholder entrypoint
+    restart: unless-stopped
+    environment:
+      <<: *oxybook-env
+      PORT: "3000"
+      # Runs pending DB migrations at startup (single app replica in dev).
+      OXYBOOK_MIGRATE_ON_START: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      # Read-only: the app serves build logs/previews but never writes sites.
+      - sites:/srv/sites:ro
+      # Optional: mount a GitHub App private key file and set GITHUB_APP_PRIVATE_KEY_FILE.
+      # - ./secrets/github-app.pem:/run/secrets/github-app.pem:ro
+    expose:
+      - "3000"
+    healthcheck:
+      # Uses Node's built-in fetch, so the image needs no curl/wget.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  worker:
+    # PLACEHOLDER: same image as app, different command (see note on app).
+    image: ${OXYBOOK_IMAGE:-localhost/oxybook:dev}
+    command: ["oxybook", "worker"]        # placeholder entrypoint
+    restart: unless-stopped
+    environment:
+      <<: *oxybook-env
+      # Number of concurrent jobs per worker (sync, propose, build).
+      OXYBOOK_WORKER_CONCURRENCY: ${OXYBOOK_WORKER_CONCURRENCY:-2}
+      HEALTH_PORT: "3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      app:
+        condition: service_healthy        # app owns migrations
+    volumes:
+      # Writable: builds, release assembly (hardlinks require one filesystem) and
+      # by-host symlinks all live under /srv/sites.
+      - sites:/srv/sites
+      # Cache of blobless partial clones; safe to delete.
+      - mirrors:/var/lib/oxybook/mirrors
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./deploy/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
+      # Read-only: Caddy only serves what the worker built.
+      - sites:/srv/sites:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      # Caddy's admin API listens on localhost:2019 inside the container.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/config/"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    # Not depending on app: published sites must stay up when the app is down.
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"             # web UI
+    expose:
+      - "1025"                            # SMTP, reachable as mailpit:1025
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  webhook-relay:
+    # Optional. Create a channel at https://smee.io, set SMEE_URL in .env, and set
+    # the same URL as the GitHub App's webhook URL (dev only).
+    profiles: ["webhooks"]
+    image: node:24-alpine
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - exec npx --yes smee-client@5 --url "$${SMEE_URL:?set SMEE_URL in .env}" --target http://app:3000/api/github/webhooks
+    environment:
+      SMEE_URL: ${SMEE_URL:-}
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  mirrors:
+  sites:
+  caddy_data:
+  caddy_config:

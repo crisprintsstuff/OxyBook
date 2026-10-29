@@ -1,0 +1,28 @@
+# Development Caddyfile for OxyBook (plain HTTP on container port 80).
+# Production adds on-demand TLS and forward_auth; see docs/ARCHITECTURE.md §5.5 and §7.
+{
+	auto_https off
+}
+
+# Editor / API
+http://app.localhost {
+	reverse_proxy app:3000
+}
+
+# Published sites. The worker maintains /srv/sites/by-host/<hostname> symlinks,
+# so this one block serves every space (and, in production, every custom domain).
+http://*.docs.localhost {
+	handle /_oxybook/* {
+		reverse_proxy app:3000
+	}
+	handle {
+		root * /srv/sites/by-host/{host}/current
+		try_files {path} {path}.html {path}/index.html
+		file_server
+	}
+	handle_errors 404 {
+		root * /srv/sites/by-host/{host}/current
+		rewrite * /404.html
+		file_server
+	}
+}
