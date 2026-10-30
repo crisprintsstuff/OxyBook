@@ -19,7 +19,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 - **Compatibility report:** `pnpm oxybook-check <dir>` reports, with `file:line` warnings, what would render as a placeholder. `pnpm compat:corpus` runs it over the pinned corpus. Results and the recommended component list are in `docs/M1-NOTES.md`. With the starting allowlist, 286 of 567 corpus files (50.4%) have no placeholder, and adding Starlight's built-ins raises that to 352 (62.1%).
 - **Database:** `packages/db/migrations/0001_schema_v0.sql` creates `orgs`, `users`, `org_members`, `sessions`, `spaces`, `space_members`, `blobs`, `ref_state`, `pages`, `drafts`, and `draft_files`. Pending files run in one transaction under Kysely's advisory lock; a failing file rolls back every pending file (tested). `apps/server` applies migrations before listening when `OXYBOOK_MIGRATE_ON_START=true`. That was first run from `apps/server/dist/main.js` on the host against the compose `postgres:17` container. On the owner's machine, the rebuilt container image applied `0001_schema_v0` to an empty database and then served. See the 2026-10-30 entries.
 - **GitHub App credentials:** With `DATABASE_URL` and `OXYBOOK_SECRET_KEY` set, the manifest callback stores the App in the `github_app` table, encrypted, and the server loads it at start. `/setup/github` returns 409 once an App is stored. `GET /api/github/oauth/callback` answers 501 until Sign in with GitHub (M2). The webhook route logs `webhook verified|rejected event=<e> delivery=<id>`. `oxybook-dev propose` reads `GITHUB_APP_INSTALLATION_ID` when `--installation-id` is absent. On 2026-10-30 the owner created App `oxybook-cris` (App id 5535294) from `/setup/github`. It was stored in the database, and GitHub's `ping` and `installation` webhooks were logged as verified. See the 2026-10-30 entries.
-- **What does not:** There is no editor, renderer, or published site. Nothing uses the database beyond migrations. Webhook payloads are verified and logged, and nothing acts on them yet. A `push` delivery has not been observed. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` are not implemented. See "M0 exit, met".
+- **What does not:** There is no editor, renderer, or published site. Nothing uses the database beyond migrations. Webhook payloads are verified and logged, and nothing acts on them yet. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` are not implemented. See "M0 exit, met".
 
 ## Milestones
 
@@ -44,7 +44,7 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 Still unverified. These are not the exit sentence, and they are not done:
 
 - **Manifest-created App.** Verified 2026-10-30: `oxybook-cris` was created from `/setup/github`, stored, installed on `oxybook-test`, and opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2).
-- **Webhook delivery** from GitHub to `/api/github/webhooks`. Verified 2026-10-30 for `ping` and `installation` through the owner's Cloudflare tunnel. A `push` delivery has not been observed yet. M1 sync needs one.
+- **Webhook delivery** from GitHub to `/api/github/webhooks`. Verified 2026-10-30 for `ping`, `installation`, `push`, and `pull_request` through the owner's Cloudflare tunnel. Nothing acts on a delivery yet.
 - **Git Database API fallback** on a repo whose ruleset requires signed commits. Unverified on `oxybook-test`. That repo has no ruleset. The earlier measurement was on this repo. See `docs/M0-GITHUB-SPIKE.md`.
 - **Database schema v0 and migrations** (Kysely + SQL migrations). Done 2026-10-30 in `packages/db`, measured on a local PostgreSQL 16 and the compose `postgres:17` image. CI runs the tests against a `postgres:17` service. The rebuilt image migrates an empty database at start and also starts against an already-migrated one.
 - **OAuth callback path.** Closed 2026-10-30: `/api/github/oauth/callback` answers 501 `Sign in with GitHub is not implemented yet`. Sign in with GitHub is M2.
@@ -66,6 +66,17 @@ In progress. `docs/M1-PLAN.md` puts the scope below in order. Slice 1, the H3 co
 **Done when:** connecting a test repo yields a published site with working nav and search; a push to the default branch (including a rename and a delete) is reflected on the site with no manual step; a dropped webhook is caught by reconciliation; stopping `app` does not take the published site down.
 
 ## Changelog
+
+### 2026-10-30 — `push` and `pull_request` webhooks arrive
+
+Merging [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) (`9f6835d1283b8ac01c0603767198e9632754c4fd`) sent two deliveries to the owner's `pnpm dev` server through `oxybook.boznetwork.com`. The server logged both:
+
+```
+webhook verified event=push delivery=bba98dc0-d402-11f1-8d39-50d5d15b54e6
+webhook verified event=pull_request delivery=bb4fac60-d402-11f1-8272-0fab7a2d3175
+```
+
+All four event types the App receives (`ping`, `installation`, `push`, `pull_request`) have now been delivered and verified with the stored webhook secret. The server only logs them. Deduplicating by delivery id and enqueuing a sync are M1 slices 3 and 4. The entry below says the `push` delivery was not checked; it was checked after that entry was written.
 
 ### 2026-10-30 — M1 slice 1: compatibility report; test repo seeded
 
