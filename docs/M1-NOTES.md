@@ -84,3 +84,14 @@ Allowlist plus Starlight's own component set (`Aside`, `Badge`, `CardGrid`, `Cod
 - The corpus is five docs sites, not five customers. Starlight's site documents its own components, so it uses them far more than a typical Starlight user would. About 20 locale directories also repeat each English page, so Starlight's file counts are inflated roughly by the number of translations of each page.
 - "Clean" says nothing about rendering quality. It only means no placeholder. Links, images, and raw HTML are not judged here.
 - `Fragment` is counted as unknown because it is capitalised. In Astro it renders its children. Treating it as a pass-through is part of the recommendation, not of the starting allowlist.
+
+## Sync (slice 4)
+
+Date: 2026-10-30. Details and numbers are in `STATUS.md`.
+
+### Where ARCHITECTURE.md is wrong or thin
+
+- **§4.2 step 2, `git diff --name-status -M <from> <to>`.** Sync does not apply that diff. It lists the content root at the new head (`git ls-tree`, trees only, no blobs) and compares the result with the stored `pages` rows. A diff needs `from` in the mirror and assumes the stored rows match `from`. Neither holds after a deleted mirror, a force-push, or a sync that failed halfway. The full comparison costs one tree listing and gives the same answer, so reconciliation can call the same function. `git diff -M` is still used, for renames only.
+- **§4.2 `blobs(sha PK, bytes)`.** Keyed by `(org_id, sha)` since schema v0 (see M0-NOTES.md).
+- **§2.5 inferred redirects.** The text does not say where they are kept. They are in `inferred_redirects`, keyed by `(space_id, ref, from_url)`, until slice 6 serves them and an admin commits them to `oxybook.yml`.
+- **§2.2 `exclude:` in `oxybook.yml`.** Not applied by sync yet. `oxybook.yml` is not read until the build (slice 6).
