@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 complete. M1 in progress: slice 1 of `docs/M1-PLAN.md` (the H3 compatibility report) is done, and the exit is not met.
+- **Milestone:** M0 complete. M1 in progress: slices 1–3 of `docs/M1-PLAN.md` are done (the H3 compatibility report, spaces without UI, and the job queue). The exit is not met.
 - **Last update:** 2026-10-30.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits. `packages/db` holds schema v0 as plain SQL migrations with Kysely types; `pnpm db:migrate` applied `0001_schema_v0` on PostgreSQL 16 and a second run reported up to date; the app's migrate-on-start did the same on PostgreSQL 17.11. No application code reads or writes those tables yet.
 - **Dev server:** `pnpm dev` prints `app listening on 3000` and `worker listening on 3001`. `GET /healthz` on those ports returned 200 `{"ok":true,"service":"app"}` and 200 `{"ok":true,"service":"worker"}`. The processes were then stopped. The app script builds `@oxybook/github` and `@oxybook/db` (since 2026-10-30) and runs `tsx watch`.
@@ -17,6 +17,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 - **Signed-commit note:** The note `docs/MVP.md` asks for exists: `docs/M0-GITHUB-SPIKE.md`. It concludes that `required_signatures` rejects an unsigned `git push` (`GH013`) and accepts a GitHub-signed Git Database API fast-forward (HTTP 200, `verification.verified: true`, `reason: "valid"`). That measurement was on this repo. It was not repeated on `oxybook-test`, and `oxybook-test` has no ruleset.
 - **M1 test repo:** [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxybook-test) is the M1 test space and the repo for later live tests (owner's decision, 2026-10-30). [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) seeded `docs/` with 11 pages, `_dir.yml` files, `oxybook.yml`, an image asset, `_partials/`, and an MDX page with imports, components, an expression, and one intentionally broken link. All 11 pass `oxybook-roundtrip`.
 - **Compatibility report:** `pnpm oxybook-check <dir>` reports, with `file:line` warnings, what would render as a placeholder. `pnpm compat:corpus` runs it over the pinned corpus. Results and the recommended component list are in `docs/M1-NOTES.md`. With the starting allowlist, 286 of 567 corpus files (50.4%) have no placeholder, and adding Starlight's built-ins raises that to 352 (62.1%).
+- **Spaces and jobs:** `pnpm oxybook-admin` creates orgs and spaces (`org create`, `space create <org>/<space> --repo owner/repo`, `space list`). Without `--installation-id`, it asks GitHub as the stored App which installation covers the repo. `packages/jobs` wraps pg-boss (schema `pgboss`). The worker works jobs when `DATABASE_URL` is set. `pnpm oxybook-admin job ping` sends a job and waits for a worker to complete it. The only queue is `ping`; sync is slice 4. Measured locally only. See the 2026-10-30 entry.
 - **Database:** `packages/db/migrations/0001_schema_v0.sql` creates `orgs`, `users`, `org_members`, `sessions`, `spaces`, `space_members`, `blobs`, `ref_state`, `pages`, `drafts`, and `draft_files`. Pending files run in one transaction under Kysely's advisory lock; a failing file rolls back every pending file (tested). `apps/server` applies migrations before listening when `OXYBOOK_MIGRATE_ON_START=true`. That was first run from `apps/server/dist/main.js` on the host against the compose `postgres:17` container. On the owner's machine, the rebuilt container image applied `0001_schema_v0` to an empty database and then served. See the 2026-10-30 entries.
 - **GitHub App credentials:** With `DATABASE_URL` and `OXYBOOK_SECRET_KEY` set, the manifest callback stores the App in the `github_app` table, encrypted, and the server loads it at start. `/setup/github` returns 409 once an App is stored. `GET /api/github/oauth/callback` answers 501 until Sign in with GitHub (M2). The webhook route logs `webhook verified|rejected event=<e> delivery=<id>`. `oxybook-dev propose` reads `GITHUB_APP_INSTALLATION_ID` when `--installation-id` is absent. On 2026-10-30 the owner created App `oxybook-cris` (App id 5535294) from `/setup/github`. It was stored in the database, and GitHub's `ping` and `installation` webhooks were logged as verified. See the 2026-10-30 entries.
 - **What does not:** There is no editor, renderer, or published site. Nothing uses the database beyond migrations. Webhook payloads are verified and logged, and nothing acts on them yet. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` are not implemented. See "M0 exit, met".
@@ -54,7 +55,7 @@ Still unverified. These are not the exit sentence, and they are not done:
 
 ## M1 next
 
-In progress. `docs/M1-PLAN.md` puts the scope below in order. Slice 1, the H3 compatibility report, is done (`docs/M1-NOTES.md`). Next come spaces without UI (slice 2) and the job queue (slice 3), which do not depend on each other, then sync against `oxybook-test`. The manifest-created App and the test repo are in place. From `docs/MVP.md`:
+In progress. `docs/M1-PLAN.md` puts the scope below in order. Slice 1 (H3 compatibility report, `docs/M1-NOTES.md`), slice 2 (spaces without UI), and slice 3 (job queue) are done. Next is slice 4: sync `oxybook-test` into `blobs`, `pages`, and `ref_state` on the `push` webhook and by reconciliation. The manifest-created App and the test repo are in place. From `docs/MVP.md`:
 
 - Accounts (email/password, sessions), organisations, spaces, Admin role.
 - GitHub App install flow in the UI; repo connection with access check; webhook sync + reconciliation; read model in PostgreSQL.
@@ -66,6 +67,21 @@ In progress. `docs/M1-PLAN.md` puts the scope below in order. Slice 1, the H3 co
 **Done when:** connecting a test repo yields a published site with working nav and search; a push to the default branch (including a rename and a delete) is reflected on the site with no manual step; a dropped webhook is caught by reconciliation; stopping `app` does not take the published site down.
 
 ## Changelog
+
+### 2026-10-30 — M1 slices 2 and 3: spaces without UI, job queue
+
+- **Slice 2.** `apps/server/src/admin.ts` and `pnpm oxybook-admin`: `org create`, `space create <org>/<space> --repo <owner/repo> [--installation-id] [--content-root docs] [--default-ref main]`, `space list`. `docs/`, `./docs`, and `docs` are stored as `docs`. Without `--installation-id`, the CLI signs an App JWT from the stored App (needs `OXYBOOK_SECRET_KEY`) and calls `GET /repos/{owner}/{repo}/installation`. A 404 becomes `<app> is not installed on owner/repo` with the install link. New `findRepoInstallation` in `packages/github`.
+- **Slice 3.** `packages/jobs` wraps pg-boss 12.38.0. Queue names and payload types live in one place, each handler call gets one job, the connection timeout is 10s, and app and worker can both create a queue at start without a race. The worker starts it when `DATABASE_URL` is set and handles `ping`. `pnpm oxybook-admin job ping` sends one and waits up to 15s for `completed`. The `Dockerfile` and the server and worker dev scripts build `@oxybook/jobs`. The worker dev script now runs `tsx watch`, because it imports a workspace package.
+
+Measured, Node v22.22.0, local PostgreSQL 16. `pnpm lint`, `pnpm typecheck`, and `pnpm test` exited 0, with 73 tests passing. New tests:
+- `packages/jobs`: 20 jobs sent to two workers ran exactly once each, by id, and a job whose handler threw on the first try was retried and completed.
+- `apps/worker`: a ping sent from a second queue client completed and logged.
+- `apps/server`: org and space create, list, duplicate and unknown-org errors, and installation lookup as a stored App against a fake GitHub (found, 404, no App, no key).
+- `packages/github`: `findRepoInstallation`.
+
+Smoke run on an empty database: `pnpm db:migrate`, then `oxybook-admin org create cris`, then `space create cris/test --repo crisprintsstuff/oxybook-test --installation-id 176737174` (stored with root `docs` and ref `main`). A repeated `org create cris` printed `already exists: ... orgs_slug_key`. `space list` printed the row. `space create` without an id and without `OXYBOOK_SECRET_KEY` refused with that reason. With a worker running, `job ping` printed `sent ping <id>` and `ping <id> completed`, and the worker logged `job ping <id> from oxybook-admin done`.
+
+Not measured: the installation lookup against real GitHub, and any of this on the owner's machine or in the container image.
 
 ### 2026-10-30 — `push` and `pull_request` webhooks arrive
 
