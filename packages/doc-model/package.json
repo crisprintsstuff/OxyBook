@@ -12,13 +12,15 @@
     }
   },
   "bin": {
-    "oxybook-roundtrip": "./dist/cli.js"
+    "oxybook-roundtrip": "./dist/cli.js",
+    "oxybook-check": "./dist/check-cli.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test test/*.test.ts",
-    "test:corpus": "node --import tsx --test test/corpus.harness.ts"
+    "test:corpus": "node --import tsx --test test/corpus.harness.ts",
+    "compat:corpus": "tsx test/corpus.compat.ts"
   },
   "dependencies": {
     "mdast-util-directive": "3.1.1",

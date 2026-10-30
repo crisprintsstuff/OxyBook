@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 complete, M1 not started.
+- **Milestone:** M0 complete. M1 in progress: slice 1 of `docs/M1-PLAN.md` (the H3 compatibility report) is done, and the exit is not met.
 - **Last update:** 2026-10-30.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits. `packages/db` holds schema v0 as plain SQL migrations with Kysely types; `pnpm db:migrate` applied `0001_schema_v0` on PostgreSQL 16 and a second run reported up to date; the app's migrate-on-start did the same on PostgreSQL 17.11. No application code reads or writes those tables yet.
 - **Dev server:** `pnpm dev` prints `app listening on 3000` and `worker listening on 3001`. `GET /healthz` on those ports returned 200 `{"ok":true,"service":"app"}` and 200 `{"ok":true,"service":"worker"}`. The processes were then stopped. The app script builds `@oxybook/github` and `@oxybook/db` (since 2026-10-30) and runs `tsx watch`.
@@ -15,6 +15,8 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 - **Git write path:** `oxybook-dev propose` was run against a local `file://` bare remote. The diff touched only `docs/a.md`. A stale `--force-with-lease` was refused. An unsigned `git push` to `ruleset-probe-test` was rejected by ruleset `26114519` (`GH013`, commits must have verified signatures). A fast-forward `PATCH /git/refs/heads/ruleset-probe-test` of a Git Database API commit returned HTTP 200; GitHub had signed that commit (`verification.verified: true`, `reason: "valid"`). The measured head was `c915f0780c13f25cdf01870fcda216b721c576cf`. Details are in `docs/M0-GITHUB-SPIKE.md`. The same command has since opened a pull request on GitHub. See "Live pull request".
 - **Live pull requests:** [crisprintsstuff/oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), opened 2026-10-30 by the manifest-created App `oxybook-cris[bot]`, is open with one added file, `docs/test-page-2.md` (+3/-0). [crisprintsstuff/oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) was merged on 2026-10-29 (see the 2026-10-30 entry). It was opened on the public repo [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxybook-test) (default branch `main`). Title `Update docs/test-page.md`. Head branch `oxybook/dev/page-1`. Author is the GitHub App bot `oxybook-dev-cb[bot]`, App id 5530818, installation id 176643684. `GET /repos/crisprintsstuff/oxybook-test/pulls/1/files` returned exactly one entry: `docs/test-page.md`, added, +3/-0. The body contained `Pages changed: docs/test-page.md` and `Link back: https://oxybook.boznetwork.com`. The command was `pnpm oxybook-dev propose <file> --remote https://github.com/crisprintsstuff/oxybook-test.git --github-owner crisprintsstuff --github-repo oxybook-test --installation-id 176643684 --base main --path docs/test-page.md`, with `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY_FILE` set. It exited 0 and printed the commit, the ref, the base, the author, `pr <url>`, and the diff. The App was created by hand at `https://github.com/settings/apps/new`, not through `/setup/github`. The run was Node v22.23.1, not 24. pnpm printed an Unsupported engine warning and the command succeeded. That is a known deviation, not evidence that Node 22 is supported.
 - **Signed-commit note:** The note `docs/MVP.md` asks for exists: `docs/M0-GITHUB-SPIKE.md`. It concludes that `required_signatures` rejects an unsigned `git push` (`GH013`) and accepts a GitHub-signed Git Database API fast-forward (HTTP 200, `verification.verified: true`, `reason: "valid"`). That measurement was on this repo. It was not repeated on `oxybook-test`, and `oxybook-test` has no ruleset.
+- **M1 test repo:** [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxybook-test) is the M1 test space and the repo for later live tests (owner's decision, 2026-10-30). [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) seeded `docs/` with 11 pages, `_dir.yml` files, `oxybook.yml`, an image asset, `_partials/`, and an MDX page with imports, components, an expression, and one intentionally broken link. All 11 pass `oxybook-roundtrip`.
+- **Compatibility report:** `pnpm oxybook-check <dir>` reports, with `file:line` warnings, what would render as a placeholder. `pnpm compat:corpus` runs it over the pinned corpus. Results and the recommended component list are in `docs/M1-NOTES.md`. With the starting allowlist, 286 of 567 corpus files (50.4%) have no placeholder, and adding Starlight's built-ins raises that to 352 (62.1%).
 - **Database:** `packages/db/migrations/0001_schema_v0.sql` creates `orgs`, `users`, `org_members`, `sessions`, `spaces`, `space_members`, `blobs`, `ref_state`, `pages`, `drafts`, and `draft_files`. Pending files run in one transaction under Kysely's advisory lock; a failing file rolls back every pending file (tested). `apps/server` applies migrations before listening when `OXYBOOK_MIGRATE_ON_START=true`. That was first run from `apps/server/dist/main.js` on the host against the compose `postgres:17` container. On the owner's machine, the rebuilt container image applied `0001_schema_v0` to an empty database and then served. See the 2026-10-30 entries.
 - **GitHub App credentials:** With `DATABASE_URL` and `OXYBOOK_SECRET_KEY` set, the manifest callback stores the App in the `github_app` table, encrypted, and the server loads it at start. `/setup/github` returns 409 once an App is stored. `GET /api/github/oauth/callback` answers 501 until Sign in with GitHub (M2). The webhook route logs `webhook verified|rejected event=<e> delivery=<id>`. `oxybook-dev propose` reads `GITHUB_APP_INSTALLATION_ID` when `--installation-id` is absent. On 2026-10-30 the owner created App `oxybook-cris` (App id 5535294) from `/setup/github`. It was stored in the database, and GitHub's `ping` and `installation` webhooks were logged as verified. See the 2026-10-30 entries.
 - **What does not:** There is no editor, renderer, or published site. Nothing uses the database beyond migrations. Webhook payloads are verified and logged, and nothing acts on them yet. A `push` delivery has not been observed. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` are not implemented. See "M0 exit, met".
@@ -26,7 +28,7 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | Milestone | Status |
 | --- | --- |
 | M0 — Foundations and risk spikes | complete |
-| M1 — Read path and published site | not started |
+| M1 — Read path and published site | in progress |
 | M2 — Editor and write path | not started |
 | M3 — Conflicts, versions, renames | not started |
 | M4 — Production readiness, v1.0 | not started |
@@ -52,7 +54,7 @@ Still unverified. These are not the exit sentence, and they are not done:
 
 ## M1 next
 
-Not started. No M1 code is in the tree. `docs/M1-PLAN.md` puts the scope below in order: the H3 compatibility report first, then spaces, the job queue, sync, renderer, build, theme, accounts, and an exit run. The manifest-created App is proven. The owner still has to choose the M1 test repo. From `docs/MVP.md`:
+In progress. `docs/M1-PLAN.md` puts the scope below in order. Slice 1, the H3 compatibility report, is done (`docs/M1-NOTES.md`). Next come spaces without UI (slice 2) and the job queue (slice 3), which do not depend on each other, then sync against `oxybook-test`. The manifest-created App and the test repo are in place. From `docs/MVP.md`:
 
 - Accounts (email/password, sessions), organisations, spaces, Admin role.
 - GitHub App install flow in the UI; repo connection with access check; webhook sync + reconciliation; read model in PostgreSQL.
@@ -64,6 +66,23 @@ Not started. No M1 code is in the tree. `docs/M1-PLAN.md` puts the scope below i
 **Done when:** connecting a test repo yields a published site with working nav and search; a push to the default branch (including a rename and a delete) is reflected on the site with no manual step; a dropped webhook is caught by reconciliation; stopping `app` does not take the published site down.
 
 ## Changelog
+
+### 2026-10-30 — M1 slice 1: compatibility report; test repo seeded
+
+The owner chose `crisprintsstuff/oxybook-test` as the M1 test repo. [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) merged as `9f6835d1283b8ac01c0603767198e9632754c4fd`. It adds a docs tree that exercises nav, frontmatter keys, links, callouts, assets, and MDX components. `pnpm oxybook-roundtrip` on its `docs/` reported 11 pass, 0 fail. The merge was a push to `main`. Whether the owner's server logged a `push` webhook for it was not checked.
+
+`packages/doc-model` gains `compat.ts`, the `oxybook-check` CLI (`pnpm oxybook-check <dir> [--json] [--allow Name,...]`), and `pnpm compat:corpus`. Nothing is executed. The counts cover unknown and allowlisted JSX components, non-static props (JSON literals count as static), imports by specifier, exports, expressions (comments are counted separately), callouts, GitHub alerts, non-callout directives, text directives, MkDocs `!!!` admonitions and pymdownx tabs outside code, and capitalised tags in `.md` HTML.
+
+Measured on the pinned corpus (Node v22.22.0; `pnpm test:corpus` still 100% identity on parseable files): 567 files, 379 `.mdx`, 0 unparseable. 286 (50.4%) have no placeholder with the starting allowlist (`Callout`, `Tabs`, `TabItem`, `Card`, `CodeGroup`). Per repo: Docusaurus 71/89, Starlight 78/338, VitePress 34/36, MkDocs 18/19, MkDocs Material 85/85. Unknown components cover 269 files. The top ones by files are `Fragment` 95, `Preview` 88, `Steps` 63, `FileTree` 58, `CardGrid` 48, and `LinkCard` 39, all from Starlight. Adding Starlight's built-ins and `Fragment` as a pass-through gives 352/567 (62.1%). Full tables, findings, and caveats are in `docs/M1-NOTES.md`.
+
+Findings that change plans:
+
+- `CodeGroup` and `Callout` never appear as JSX in the corpus. Callouts arrive as `:::` containers and as Starlight's `<Aside>`, and code groups as VitePress `::: code-group`.
+- Import mapping needs named imports from one module (`@astrojs/starlight/components`, 241 files). ARCHITECTURE §5.2 only maps one specifier to one component. The correction is recorded in `docs/M1-NOTES.md`.
+- remark-directive reads `localhost:8000`, `4.5:1`, and similar as text directives (10 in 7 files). The renderer must print them back as text.
+- MkDocs Material uses `!!!` admonitions in 39 of 85 files. They stay raw text in v1, per MVP.md.
+
+Tests: `pnpm lint`, `pnpm typecheck`, and `pnpm test` exited 0. `packages/doc-model` ran 31 tests, all passing; 4 of them are new compat tests. Also fixed in passing: `oxybook-check --json` truncated piped output at 64 KB because the CLI called `process.exit()`. It now sets `process.exitCode`.
 
 ### 2026-10-30 — Manifest-created App opens a pull request; webhooks arrive
 

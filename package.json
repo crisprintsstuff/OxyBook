@@ -10,11 +10,13 @@
     "build": "pnpm -r --if-present run build",
     "test": "pnpm -r --if-present run test && pnpm exec tsx --test spikes/conflicts/conflicts.test.ts",
     "test:corpus": "pnpm --filter @oxybook/doc-model run test:corpus",
+    "compat:corpus": "pnpm --filter @oxybook/doc-model run compat:corpus",
     "db:migrate": "pnpm --filter @oxybook/db run migrate",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "pnpm -r --if-present run typecheck && tsc -p spikes/conflicts/tsconfig.json --noEmit",
     "oxybook-roundtrip": "tsx packages/doc-model/src/cli.ts",
+    "oxybook-check": "tsx packages/doc-model/src/check-cli.ts",
     "oxybook-dev": "tsx packages/git-write/src/cli.ts",
     "dev": "pnpm --parallel --filter @oxybook/server --filter @oxybook/worker run dev"
   },
