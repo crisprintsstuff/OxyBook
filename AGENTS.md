@@ -14,6 +14,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 6. `STATUS.md` — what is in progress. That file is the status source of truth. Do not duplicate it here.
 7. `docs/LIVE-INSTALL.md` — the owner's checklist for a live GitHub App created from `/setup/github`. Run once on 2026-10-30; results are in `STATUS.md`.
 8. `docs/M1-PLAN.md` — M1 scope in order. A plan, not a record.
+9. `docs/M1-NOTES.md` — M1 measurements: the H3 compatibility report and the component list it recommends.
 
 ## Hard constraints
 
@@ -26,14 +27,14 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is not started, and no M1 code is in the tree. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand. On 2026-10-30 an App created from `/setup/github` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and GitHub's `ping` and `installation` webhooks were verified. A `push` delivery has not been observed. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is complete. M1 is in progress: the H3 compatibility report (`oxybook-check`, `docs/M1-NOTES.md`) is done, and `crisprintsstuff/oxybook-test` is the M1 test repo. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand. On 2026-10-30 an App created from `/setup/github` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and GitHub's `ping` and `installation` webhooks were verified. A `push` delivery has not been observed. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
 ```
 apps/server            AGPL   HTTP process. /healthz, migrations on start, GitHub manifest flow (App stored encrypted), webhook verify.
 apps/worker            AGPL   worker process. M0: GET /healthz only.
-packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLI.
+packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLIs (oxybook-roundtrip, oxybook-check).
 packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.
 packages/git-write      AGPL   blobless mirror, commit from a temporary index, push to oxybook/*.
 packages/db             AGPL   schema v0 as plain SQL migrations, Kysely types and connection, migrator.
@@ -62,6 +63,8 @@ pnpm lint
 pnpm typecheck
 pnpm build
 pnpm oxybook-roundtrip <file-or-directory>
+pnpm oxybook-check <dir>      # what would render as a placeholder, file:line
+pnpm compat:corpus           # the H3 report over corpus/cache; run test:corpus first
 pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git
 # no leading -- before propose; pnpm forwards it and the parser used to treat "propose" as the file
 ```
@@ -86,4 +89,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- M0's exit is met by the pull request in `STATUS.md`. Do not mark M1 started. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.
+- M0's exit is met by the pull request in `STATUS.md`. M1 is in progress; do not mark it done until the exit run in `docs/M1-PLAN.md` slice 9 is recorded. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.
