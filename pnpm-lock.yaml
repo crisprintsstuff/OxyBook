@@ -29,6 +29,9 @@ importers:
       '@oxybook/github':
         specifier: workspace:*
         version: link:../../packages/github
+      '@oxybook/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
     devDependencies:
       '@types/node':
         specifier: 26.6.6
@@ -41,10 +44,20 @@ importers:
         version: 7.0.2
 
   apps/worker:
+    dependencies:
+      '@oxybook/jobs':
+        specifier: workspace:*
+        version: link:../../packages/jobs
     devDependencies:
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
+      '@types/pg':
+        specifier: 8.23.1
+        version: 8.23.1
+      pg:
+        specifier: 8.23.1
+        version: 8.23.1
       tsx:
         specifier: 4.23.15
         version: 4.23.15

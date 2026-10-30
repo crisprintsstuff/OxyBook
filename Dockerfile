@@ -12,7 +12,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc tsconfig.base.json .
 COPY apps ./apps
 COPY packages ./packages
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @oxybook/github --filter @oxybook/db build && pnpm --filter @oxybook/server --filter @oxybook/worker build
+RUN pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/jobs build && pnpm --filter @oxybook/server --filter @oxybook/worker build
 
 FROM node:24-bookworm-slim
 RUN apt-get update \

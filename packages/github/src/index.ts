@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export { InstallationTokenCache } from './installation-token.js';
+export { findRepoInstallation } from './installations.js';
 export { type AppJwtClaims, readAppJwtClaims, signAppJwt, verifyAppJwt } from './jwt.js';
 export {
   type AppCredentials,
