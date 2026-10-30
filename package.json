@@ -18,6 +18,7 @@
     "oxybook-roundtrip": "tsx packages/doc-model/src/cli.ts",
     "oxybook-check": "tsx packages/doc-model/src/check-cli.ts",
     "oxybook-dev": "tsx packages/git-write/src/cli.ts",
+    "oxybook-admin": "pnpm -s --filter @oxybook/server run admin",
     "dev": "pnpm --parallel --filter @oxybook/server --filter @oxybook/worker run dev"
   },
   "devDependencies": {

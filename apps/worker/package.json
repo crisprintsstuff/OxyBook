@@ -4,16 +4,21 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "description": "OxyBook worker process. M0 exposes /healthz only.",
+  "description": "OxyBook worker process. Serves /healthz and works jobs from the PostgreSQL queue.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test test/*.test.ts",
-    "dev": "node --watch src/main.ts",
+    "typecheck": "pnpm --filter @oxybook/jobs build && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @oxybook/jobs build && node --import tsx --test test/*.test.ts",
+    "dev": "pnpm --filter @oxybook/jobs build && tsx watch src/main.ts",
     "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@oxybook/jobs": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2"
   }

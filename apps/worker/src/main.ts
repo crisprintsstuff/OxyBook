@@ -2,6 +2,7 @@
 
 import { createServer, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { type JobQueue, startJobs } from '@oxybook/jobs';
 
 export interface HealthServer {
   port: number;
@@ -50,6 +51,33 @@ function closeServer(server: Server): Promise<void> {
   });
 }
 
+/**
+ * Registers a handler per queue. Without DATABASE_URL the worker only serves /healthz,
+ * which is what compose's health check and the M0 tests need.
+ */
+export async function startJobWorker(
+  databaseUrl: string,
+  options: { log?: (line: string) => void; schema?: string; pollingIntervalSeconds?: number } = {},
+): Promise<JobQueue> {
+  const log = options.log ?? ((line: string) => console.log(line));
+  const jobs = await startJobs(databaseUrl, {
+    log,
+    ...(options.schema ? { schema: options.schema } : {}),
+  });
+  const polling =
+    options.pollingIntervalSeconds !== undefined
+      ? { pollingIntervalSeconds: options.pollingIntervalSeconds }
+      : {};
+  await jobs.work(
+    'ping',
+    async (job) => {
+      log(`job ping ${job.id} from ${job.data.requestedBy} done`);
+    },
+    polling,
+  );
+  return jobs;
+}
+
 function invokedDirectly(): boolean {
   if (!process.argv[1]) return false;
   return fileURLToPath(import.meta.url) === process.argv[1] || process.argv[1].endsWith('main.js');
@@ -58,8 +86,14 @@ function invokedDirectly(): boolean {
 if (invokedDirectly()) {
   const port = Number(process.env.HEALTH_PORT ?? 3001);
   startHealthServer({ port, service: 'worker' })
-    .then(({ port: bound }) => {
+    .then(async ({ port: bound }) => {
       console.log(`worker listening on ${bound}`);
+      if (!process.env.DATABASE_URL) {
+        console.log('jobs: off (DATABASE_URL is not set)');
+        return;
+      }
+      await startJobWorker(process.env.DATABASE_URL);
+      console.log('jobs: working on ping');
     })
     .catch((error: unknown) => {
       console.error(error);
