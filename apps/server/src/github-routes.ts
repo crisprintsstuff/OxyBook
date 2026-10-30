@@ -23,6 +23,11 @@ export interface GithubRouteOptions {
   /** Durable save after the manifest exchange. Without it, credentials live in memory only. */
   persist?: (credentials: AppCredentials) => Promise<void>;
   log?: (line: string) => void;
+  /**
+   * Called after a delivery's signature is verified. A throw answers 500, so GitHub
+   * marks the delivery failed and it can be redelivered.
+   */
+  onDelivery?: (delivery: { event: string; delivery: string; payload: unknown }) => Promise<void>;
   now?: () => number;
 }
 
@@ -149,6 +154,23 @@ export function createGithubRoutes(options: GithubRouteOptions): {
           return true;
         }
         log(`webhook verified event=${event} delivery=${delivery}`);
+        if (options.onDelivery) {
+          let payload: unknown = null;
+          try {
+            payload = JSON.parse(rawBody.toString('utf8'));
+          } catch {
+            payload = null;
+          }
+          try {
+            await options.onDelivery({ event, delivery, payload });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            log(`webhook ${delivery} not handled: ${message}`);
+            response.writeHead(500, { 'content-type': 'text/plain; charset=utf-8' });
+            response.end('delivery not handled');
+            return true;
+          }
+        }
         response.writeHead(204);
         response.end();
         return true;

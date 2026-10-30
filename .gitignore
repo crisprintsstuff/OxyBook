@@ -8,3 +8,5 @@ coverage/
 *.log
 spikes/conflicts/tmp/
 .biome/
+.oxybook-mirrors/
+.oxybook-mirror/

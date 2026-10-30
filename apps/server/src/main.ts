@@ -2,9 +2,17 @@
 
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { createDb, describeDatabaseUrl, migrateToLatest } from '@oxybook/db';
+import {
+  createDb,
+  deriveSecretsKey,
+  describeDatabaseUrl,
+  loadAppCredentials,
+  migrateToLatest,
+  saveAppCredentials,
+} from '@oxybook/db';
 import { type AppCredentials, MemoryAppCredentials } from '@oxybook/github';
-import { deriveSecretsKey, loadAppCredentials, saveAppCredentials } from './app-credentials.js';
+import { startJobs } from '@oxybook/jobs';
+import { type Delivery, handleDelivery, pruneDeliveries } from './deliveries.js';
 import { createGithubRoutes } from './github-routes.js';
 
 export interface HealthServer {
@@ -60,6 +68,7 @@ export function startAppServer(options: {
   publicUrl?: string;
   store?: MemoryAppCredentials;
   persist?: (credentials: AppCredentials) => Promise<void>;
+  onDelivery?: (delivery: Delivery) => Promise<void>;
 }): Promise<HealthServer> {
   const publicUrl =
     options.publicUrl ?? process.env.OXYBOOK_PUBLIC_URL ?? 'http://app.localhost:8080';
@@ -67,6 +76,7 @@ export function startAppServer(options: {
     owner: { kind: 'user' },
     ...(options.store ? { store: options.store } : {}),
     ...(options.persist ? { persist: options.persist } : {}),
+    ...(options.onDelivery ? { onDelivery: options.onDelivery } : {}),
     manifest: {
       name: 'OxyBook',
       url: publicUrl,
@@ -176,13 +186,45 @@ export async function appCredentialsFromEnv(
   return { store, persist: (credentials) => saveAppCredentials(db, key, credentials) };
 }
 
+/**
+ * With DATABASE_URL, a verified push to a space's default branch queues a sync job.
+ * Without it, webhooks are verified and logged only.
+ */
+export async function deliveryHandlerFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  log: (line: string) => void = console.log,
+): Promise<((delivery: Delivery) => Promise<void>) | undefined> {
+  if (!env.DATABASE_URL) {
+    log('webhooks: verify and log only (DATABASE_URL is not set)');
+    return undefined;
+  }
+  const db = createDb(env.DATABASE_URL, { max: 4 });
+  const jobs = await startJobs(env.DATABASE_URL, { log });
+  await pruneDeliveries(db);
+  return async (delivery) => {
+    const outcome = await handleDelivery(db, jobs, delivery);
+    if (outcome.kind === 'duplicate') {
+      log(`webhook ${delivery.delivery} seen before; ignored`);
+    } else if (outcome.kind === 'ignored') {
+      log(`webhook ${delivery.delivery} ${delivery.event}: nothing to do (${outcome.reason})`);
+    } else {
+      for (const queued of outcome.spaces) {
+        log(
+          `webhook ${delivery.delivery} push: sync ${queued.job ?? 'already queued'} for space ${queued.spaceId} ${queued.ref}`,
+        );
+      }
+    }
+  };
+}
+
 if (invokedDirectly()) {
   const port = Number(process.env.PORT ?? 3000);
   migrateOnStart()
     .then(async (applied) => {
       for (const name of applied) console.log(`migrated ${name}`);
       const credentials = await appCredentialsFromEnv();
-      return startAppServer({ port, ...credentials });
+      const onDelivery = await deliveryHandlerFromEnv();
+      return startAppServer({ port, ...credentials, ...(onDelivery ? { onDelivery } : {}) });
     })
     .then(({ port: bound }) => {
       console.log(`app listening on ${bound}`);

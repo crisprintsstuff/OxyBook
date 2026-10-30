@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createDb, databaseUrlFromEnv } from '@oxybook/db';
-import { startJobs } from '@oxybook/jobs';
+import path from 'node:path';
+import { createDb, type Database, databaseUrlFromEnv, type Kysely } from '@oxybook/db';
+import { startJobs, syncKey } from '@oxybook/jobs';
+import { runSpaceSync, storedAppTokens } from '@oxybook/sync';
 import { createOrg, createSpace, listSpaces, lookupInstallation, parseRepo } from './admin.js';
 
 const USAGE = `usage:
@@ -9,10 +11,27 @@ const USAGE = `usage:
   oxybook-admin space create <org>/<space> --repo <owner/repo> [--name <name>]
       [--installation-id <id>] [--content-root docs] [--default-ref main]
   oxybook-admin space list
+  oxybook-admin sync <org>/<space> [--now]
+  oxybook-admin pages <org>/<space>
   oxybook-admin job ping
 
 Needs DATABASE_URL. Without --installation-id, space create asks GitHub as the stored App,
-which needs OXYBOOK_SECRET_KEY.`;
+which needs OXYBOOK_SECRET_KEY. sync queues a job for the worker; --now runs it here
+(needs OXYBOOK_SECRET_KEY, mirrors under OXYBOOK_MIRRORS_DIR or ./.oxybook-mirrors).`;
+
+async function findSpace(db: Kysely<Database>, target: string | undefined) {
+  const [orgSlug, slug] = (target ?? '').split('/');
+  if (!orgSlug || !slug) throw new Error('expected <org>/<space>');
+  const space = await db
+    .selectFrom('spaces')
+    .innerJoin('orgs', 'orgs.id', 'spaces.org_id')
+    .select(['spaces.id as id', 'spaces.default_ref as ref'])
+    .where('orgs.slug', '=', orgSlug)
+    .where('spaces.slug', '=', slug)
+    .executeTakeFirst();
+  if (!space) throw new Error(`no space ${orgSlug}/${slug}`);
+  return space;
+}
 
 function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -37,6 +56,7 @@ export async function main(argv: readonly string[], env = process.env): Promise<
         requestedBy: 'oxybook-admin',
         at: new Date().toISOString(),
       });
+      if (!id) throw new Error('ping was not queued');
       console.log(`sent ping ${id}`);
       const deadline = Date.now() + 15_000;
       let state = await jobs.state('ping', id);
@@ -91,6 +111,71 @@ export async function main(argv: readonly string[], env = process.env): Promise<
       console.log(
         `space ${orgSlug}/${slug} ${space.id} -> ${owner}/${repo} (installation ${installationId})`,
       );
+      return 0;
+    }
+    if (noun === 'sync') {
+      const space = await findSpace(db, verb);
+      if (args.includes('--now')) {
+        const result = await runSpaceSync(
+          {
+            db,
+            tokenFor: storedAppTokens(db, env.OXYBOOK_SECRET_KEY),
+            githubUrl: env.OXYBOOK_GITHUB_URL ?? 'https://github.com',
+            mirrorsDir: env.OXYBOOK_MIRRORS_DIR ?? path.resolve('.oxybook-mirrors'),
+            log: (line) => console.log(line),
+          },
+          space.id,
+        );
+        for (const [label, list] of [
+          ['added', result.added],
+          ['modified', result.modified],
+          ['deleted', result.deleted],
+        ] as const) {
+          for (const item of list) console.log(`${label} ${item}`);
+        }
+        for (const rename of result.renamed) {
+          console.log(
+            `renamed ${rename.from} -> ${rename.to} (redirect ${rename.fromUrl} -> ${rename.toUrl})`,
+          );
+        }
+        return 0;
+      }
+      const jobs = await startJobs(databaseUrlFromEnv(env), { log: () => {} });
+      try {
+        const id = await jobs.send(
+          'sync',
+          { spaceId: space.id, ref: space.ref, reason: 'manual' },
+          { singletonKey: syncKey(space.id, space.ref) },
+        );
+        console.log(id ? `queued sync ${id}` : 'a sync for this space is already queued');
+      } finally {
+        await jobs.stop();
+      }
+      return 0;
+    }
+    if (noun === 'pages') {
+      const space = await findSpace(db, verb);
+      const state = await db
+        .selectFrom('ref_state')
+        .select(['head_sha', 'synced_at'])
+        .where('space_id', '=', space.id)
+        .where('ref', '=', space.ref)
+        .executeTakeFirst();
+      if (!state) {
+        console.log('not synced yet');
+        return 0;
+      }
+      console.log(`${space.ref} at ${state.head_sha}, synced ${state.synced_at.toISOString()}`);
+      const rows = await db
+        .selectFrom('pages')
+        .select(['path', 'url', 'title', 'hidden'])
+        .where('space_id', '=', space.id)
+        .where('ref', '=', space.ref)
+        .orderBy('url')
+        .execute();
+      for (const row of rows) {
+        console.log(`${row.url}\t${row.path}\t${row.title}${row.hidden ? '\t(hidden)' : ''}`);
+      }
       return 0;
     }
     if (noun === 'space' && verb === 'list') {
