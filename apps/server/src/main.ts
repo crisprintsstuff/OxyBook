@@ -2,6 +2,7 @@
 
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
+import { createDb, migrateToLatest } from '@oxybook/db';
 import { createGithubRoutes } from './github-routes.js';
 
 export interface HealthServer {
@@ -115,9 +116,31 @@ function invokedDirectly(): boolean {
   return fileURLToPath(import.meta.url) === process.argv[1] || process.argv[1].endsWith('main.js');
 }
 
+/**
+ * Compose sets OXYBOOK_MIGRATE_ON_START on the single app replica, and the worker waits
+ * for app to be healthy, so migrations finish before either process serves anything.
+ */
+export async function migrateOnStart(env: NodeJS.ProcessEnv = process.env): Promise<string[]> {
+  if (env.OXYBOOK_MIGRATE_ON_START !== 'true') return [];
+  if (!env.DATABASE_URL) {
+    throw new Error('OXYBOOK_MIGRATE_ON_START is true but DATABASE_URL is not set');
+  }
+  const db = createDb(env.DATABASE_URL, { max: 1 });
+  try {
+    const { applied } = await migrateToLatest(db);
+    return applied;
+  } finally {
+    await db.destroy();
+  }
+}
+
 if (invokedDirectly()) {
   const port = Number(process.env.PORT ?? 3000);
-  startAppServer({ port })
+  migrateOnStart()
+    .then((applied) => {
+      for (const name of applied) console.log(`migrated ${name}`);
+      return startAppServer({ port });
+    })
     .then(({ port: bound }) => {
       console.log(`app listening on ${bound}`);
     })

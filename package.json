@@ -10,6 +10,7 @@
     "build": "pnpm -r --if-present run build",
     "test": "pnpm -r --if-present run test && pnpm exec tsx --test spikes/conflicts/conflicts.test.ts",
     "test:corpus": "pnpm --filter @oxybook/doc-model run test:corpus",
+    "db:migrate": "pnpm --filter @oxybook/db run migrate",
     "lint": "biome check .",
     "format": "biome format --write .",
     "typecheck": "pnpm -r --if-present run typecheck && tsc -p spikes/conflicts/tsconfig.json --noEmit",

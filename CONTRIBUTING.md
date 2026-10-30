@@ -28,10 +28,11 @@ Requirements: Docker with Compose v2, Node.js 24 LTS, pnpm (via `corepack enable
 cp .env.example .env
 docker compose up -d postgres mailpit caddy   # infrastructure
 pnpm install
+DATABASE_URL=postgres://oxybook:oxybook-dev@127.0.0.1:5432/oxybook pnpm db:migrate
 pnpm dev                                      # app and worker on the host, with reload
 ```
 
-`pnpm db:migrate` is not implemented. There is no migration runner in this tree. Do not run that command.
+`pnpm db:migrate` applies the plain SQL files in `packages/db/migrations/` in filename order, in one transaction, and records them in `kysely_migration`. Migrations are forward-only: never edit a file that has merged, add a new one. In compose, `app` runs the same migrations at start (`OXYBOOK_MIGRATE_ON_START=true`). `pnpm test:integration` and `pnpm test:e2e` are not implemented.
 
 Or run everything in containers, as the README quickstart does: `docker compose up -d`. Then open <http://app.localhost:8080>.
 
@@ -40,7 +41,7 @@ To test the GitHub integration, create a personal development GitHub App from th
 ## Tests
 
 ```sh
-pnpm test                 # unit tests, all packages
+pnpm test                 # unit tests, all packages; packages/db needs DATABASE_URL or it skips
 pnpm test:corpus          # round-trip identity over the pinned documentation corpus (fetches by SHA)
 pnpm lint && pnpm typecheck
 ```
