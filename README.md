@@ -70,7 +70,7 @@ What that gives you today:
 - `app` (API and GitHub webhooks) and `worker` (jobs and sync) report healthy. Migrations run when `app` starts.
 - `/setup/github` creates a GitHub App with the App Manifest flow and stores its credentials, encrypted under `OXYBOOK_SECRET_KEY`. GitHub must reach the app over HTTPS to deliver webhooks: use a tunnel, as described in [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md), or the `webhooks` compose profile with a smee.io channel.
 - Spaces are created with `pnpm oxybook-admin space create <org>/<space> --repo owner/repo` (see LIVE-INSTALL.md). A push to the space's branch syncs its pages into PostgreSQL and builds the static site into `/srv/sites` (`./.oxybook-sites` on the host), served by Caddy at `http://<space-slug>.docs.localhost:8080`. `pnpm oxybook-admin pages <org>/<space>` lists synced pages, and `pnpm oxybook-admin build <org>/<space> [--now]` triggers a build.
-- Not yet: an admin account, a space screen, the standalone default theme package, and email. Those come in the remaining M1 slices and M2 ([docs/M1-PLAN.md](docs/M1-PLAN.md)).
+- Not yet: an admin account, a space screen, and email. Those come in the remaining M1 slices and M2 ([docs/M1-PLAN.md](docs/M1-PLAN.md)).
 
 For development on the host instead of in containers (`pnpm dev`), see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md).
 

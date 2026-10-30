@@ -133,3 +133,16 @@ Date: 2026-10-30. Node v22.23.1. Details and measurements are in `STATUS.md`.
 - **§5.3 directory index pages and Caddy `try_files`.** `Caddyfile.dev` uses `try_files {path} {path}.html {path}/index.html`. When a page URL such as `/guides` also has a directory `guides/` on disk (because `guides/install.html` and `guides/images/stack.svg` live inside it), `{path}` matches the directory `guides/`, so Caddy's `file_server` looks for `guides/index.html`. `buildSiteVersion` writes `guides.html` and hardlinks `guides/index.html` to `guides.html` whenever a sibling directory `guides/` exists, so both `/guides` and `/guides/` return 200 with zero duplicated bytes while leaf pages (`/getting-started`, `/guides/install`) are served from `<path>.html` with no trailing-slash redirect.
 - **§5.3 redirects when `app` is stopped.** Explicit `redirects:` in `oxybook.yml` and `inferred_redirects` rows from `git diff -M` are emitted as static HTML redirect files (`<meta http-equiv="refresh">`, `<link rel="canonical">`, `location.replace`) without `data-pagefind-body`, so redirects work when `app` is stopped (invariant 4) and are not indexed by Pagefind.
 - **Port 8080 on the owner's machine.** `qBittorrent` holds port 8080 on the owner's Windows/WSL2 host, which prevented Docker from binding `8080:80` on `caddy`. `docker-compose.yml` now parameterizes the host port as `${CADDY_PORT:-8080}:80` (with `CADDY_PORT=8180` in the owner's `.env`) and the sites volume as `${OXYBOOK_SITES_VOLUME:-sites}:/srv/sites` (`./.oxybook-sites` in `.env` so host `pnpm dev` / `oxybook-admin` builds are served directly by the compose `caddy` container).
+
+## Default theme v0 (slice 7)
+
+Date: 2026-10-30. Node v22.23.1. Details and measurements are in `STATUS.md`.
+
+### Package boundary and licensing
+
+- `packages/theme-default` is licensed `Apache-2.0` (`LICENSING.md`, ARCHITECTURE §10) and has zero runtime dependencies on AGPL workspace packages (`packages/doc-model`, `packages/renderer`, `packages/sync`, `packages/db`, `packages/jobs`). `@oxybook/renderer` (`AGPL-3.0-only`) imports `@oxybook/theme-default`.
+- Ships `renderPageDocument`, `render404Document`, `renderRedirectDocument`, `flattenNavPages`, `findPrevNextPages`, `buildThemeStyles`, `DEFAULT_THEME_CSS`, and `buildThemeClientScript`.
+- Client-side island script (`buildThemeClientScript`) hydrates:
+  - `<Tabs>` / `<TabItem>` (`.oxybook-tabs`) with keyboard arrow navigation and `data-tabs-group` + `localStorage` synchronization across the page;
+  - `::: code-group` / `<CodeGroup>` (`.oxybook-code-group`) by generating a `<div class="oxybook-tabs-list" role="tablist">` from the child `<pre>` blocks' `data-title` or `data-language`;
+  - Pagefind search UI (`#oxybook-search`, `/` and `Ctrl+K` / `Cmd+K` focus shortcut), mobile sidebar drawer toggle (`.oxybook-mobile-toggle` + `Escape`), and header version switcher (`[data-version-switcher]`).

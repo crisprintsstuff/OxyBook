@@ -298,6 +298,17 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
 
   const rootDirConfig = parsedDirs.get('');
   const siteTitle = config.title ?? rootDirConfig?.title ?? input.spaceName;
+  const versionLinks =
+    config.versions.length > 1
+      ? config.versions.map((v, idx) => {
+          const isDef = v.default ?? idx === 0;
+          return {
+            name: v.name,
+            url: isDef ? '/' : `/${v.name.replace(/^\/+|\/+$/g, '')}/`,
+            current: v.name === input.version || (isDef && isDefault),
+          };
+        })
+      : undefined;
 
   const activePages = input.pages
     .filter((p) => !isExcluded(p.path, config.exclude))
@@ -396,6 +407,8 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
       nav,
       headings: rendered.searchDoc.headings,
       ...(versionPrefix ? { versionPrefix } : {}),
+      ...(versionLinks ? { versions: versionLinks } : {}),
+      ...(config.theme ? { theme: config.theme } : {}),
       searchable: !page.hidden,
     });
 
@@ -441,6 +454,8 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
       siteTitle,
       nav,
       ...(versionPrefix ? { versionPrefix } : {}),
+      ...(versionLinks ? { versions: versionLinks } : {}),
+      ...(config.theme ? { theme: config.theme } : {}),
     }),
   );
 

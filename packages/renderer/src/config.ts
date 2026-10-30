@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { ThemeConfig, ThemeHeaderLink } from '@oxybook/theme-default';
 import { parse as parseYaml } from 'yaml';
 
 /**
@@ -30,6 +31,7 @@ export interface OxybookConfig {
   components: Record<string, ComponentMapEntry>;
   redirects: RedirectRule[];
   versions: VersionConfig[];
+  theme?: ThemeConfig;
 }
 
 export function emptyOxybookConfig(): OxybookConfig {
@@ -40,6 +42,61 @@ export function emptyOxybookConfig(): OxybookConfig {
     redirects: [],
     versions: [],
   };
+}
+
+function parseThemeConfig(rawTheme: Record<string, unknown>): ThemeConfig {
+  const theme: {
+    logo?: ThemeConfig['logo'];
+    favicon?: string;
+    accentColor?: string;
+    headerLinks?: ThemeHeaderLink[];
+    footer?: string;
+    customCssUrl?: string;
+  } = {};
+  if (typeof rawTheme.logo === 'string' && rawTheme.logo.trim() !== '') {
+    theme.logo = rawTheme.logo.trim();
+  } else if (rawTheme.logo && typeof rawTheme.logo === 'object' && !Array.isArray(rawTheme.logo)) {
+    const logoObj = rawTheme.logo as Record<string, unknown>;
+    if (typeof logoObj.src === 'string' && logoObj.src.trim() !== '') {
+      theme.logo = {
+        src: logoObj.src.trim(),
+        ...(typeof logoObj.alt === 'string' && logoObj.alt.trim() !== ''
+          ? { alt: logoObj.alt.trim() }
+          : {}),
+      };
+    }
+  }
+  if (typeof rawTheme.favicon === 'string' && rawTheme.favicon.trim() !== '') {
+    theme.favicon = rawTheme.favicon.trim();
+  }
+  if (typeof rawTheme.accentColor === 'string' && rawTheme.accentColor.trim() !== '') {
+    theme.accentColor = rawTheme.accentColor.trim();
+  }
+  if (typeof rawTheme.footer === 'string' && rawTheme.footer.trim() !== '') {
+    theme.footer = rawTheme.footer.trim();
+  }
+  if (typeof rawTheme.customCssUrl === 'string' && rawTheme.customCssUrl.trim() !== '') {
+    theme.customCssUrl = rawTheme.customCssUrl.trim();
+  }
+  if (Array.isArray(rawTheme.headerLinks)) {
+    const links: ThemeHeaderLink[] = [];
+    for (const item of rawTheme.headerLinks) {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        const entry = item as Record<string, unknown>;
+        if (typeof entry.label === 'string' && typeof entry.href === 'string') {
+          links.push({
+            label: entry.label,
+            href: entry.href,
+            ...(typeof entry.external === 'boolean' ? { external: entry.external } : {}),
+          });
+        }
+      }
+    }
+    if (links.length > 0) {
+      theme.headerLinks = links;
+    }
+  }
+  return theme;
 }
 
 /**
@@ -105,6 +162,9 @@ export function parseOxybookConfig(yamlSource: string): OxybookConfig {
         }
       }
     }
+  }
+  if (raw.theme && typeof raw.theme === 'object' && !Array.isArray(raw.theme)) {
+    config.theme = parseThemeConfig(raw.theme as Record<string, unknown>);
   }
   return config;
 }

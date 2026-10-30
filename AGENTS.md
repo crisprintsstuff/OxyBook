@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is in progress: slices 1–6 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve), and both the sync half and the Caddy build-and-serve check of M1's exit are measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 7, default theme v0 (`packages/theme-default`). There is no standalone theme package, accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 is complete. M1 is in progress: slices 1–7 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve, default theme v0), and both the sync half and the Caddy build-and-serve check of M1's exit are measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 8, accounts and install in the UI. There are no accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
@@ -41,6 +41,7 @@ packages/db             AGPL   schema v0 as plain SQL migrations, Kysely types a
 packages/jobs           AGPL   job queue on PostgreSQL (pg-boss): queue names, payload types, send/work.
 packages/sync           AGPL   read path: blobless mirror, page rules (URLs, titles), sync into blobs/pages/ref_state.
 packages/renderer      AGPL   mdast to hast/HTML, allowlisted components with static props, Shiki, link rewriting, import mapping, _dir.yml nav, Pagefind, static site build and release assembly.
+packages/theme-default Apache default documentation theme: layout, sidebar, TOC, prev/next pager, Tabs/CodeGroup islands, Pagefind UI.
 corpus/manifest.json          pinned doc repos (SHA + sparse path).
 corpus/fixtures               adversarial markdown, committed.
 corpus/cache                  fetched repos. Gitignored. Do not commit.
@@ -51,7 +52,7 @@ docs/M0-NOTES.md              measured results and design corrections.
 docs/M0-GITHUB-SPIKE.md       what the GitHub spike verified, and what it did not.
 ```
 
-`packages/sdk`, `packages/theme-default`, and `apps/editor` are in the architecture and are not in the tree.
+`packages/sdk` and `apps/editor` are in the architecture and are not in the tree.
 
 ## How to run it
 

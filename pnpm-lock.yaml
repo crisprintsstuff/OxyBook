@@ -209,6 +209,9 @@ importers:
       '@oxybook/sync':
         specifier: workspace:*
         version: link:../sync
+      '@oxybook/theme-default':
+        specifier: workspace:*
+        version: link:../theme-default
       hast-util-to-html:
         specifier: 9.0.6
         version: 9.0.6
@@ -255,6 +258,18 @@ importers:
       yaml:
         specifier: 2.9.1
         version: 2.9.1
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/theme-default:
     devDependencies:
       '@types/node':
         specifier: 26.6.6
