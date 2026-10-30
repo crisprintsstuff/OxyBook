@@ -25,7 +25,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is not started, and no M1 code is in the tree. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand at `https://github.com/settings/apps/new`. The manifest flow (`/setup/github`) is unverified. Webhook delivery from GitHub is unverified. Database schema v0 is not started and is not part of the M0 exit sentence. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is complete. M1 is not started, and no M1 code is in the tree. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand at `https://github.com/settings/apps/new`. The manifest flow (`/setup/github`) is unverified. Webhook delivery from GitHub is unverified. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
@@ -35,6 +35,7 @@ apps/worker            AGPL   worker process. M0: GET /healthz only.
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLI.
 packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.
 packages/git-write      AGPL   blobless mirror, commit from a temporary index, push to oxybook/*.
+packages/db             AGPL   schema v0 as plain SQL migrations, Kysely types and connection, migrator.
 corpus/manifest.json          pinned doc repos (SHA + sparse path).
 corpus/fixtures               adversarial markdown, committed.
 corpus/cache                  fetched repos. Gitignored. Do not commit.
@@ -45,7 +46,7 @@ docs/M0-NOTES.md              measured results and design corrections.
 docs/M0-GITHUB-SPIKE.md       what the GitHub spike verified, and what it did not.
 ```
 
-`packages/renderer`, `packages/sdk`, `apps/editor`, and the database are in the architecture and are not in the tree.
+`packages/renderer`, `packages/sdk`, and `apps/editor` are in the architecture and are not in the tree.
 
 ## How to run it
 
@@ -53,7 +54,8 @@ Requirements: Node.js 24, pnpm 10 (the `packageManager` field), git ≥ 2.38. On
 
 ```sh
 pnpm install
-pnpm test          # unit tests, property tests, H2 spike
+pnpm test          # unit tests, property tests, H2 spike; packages/db skips without DATABASE_URL
+pnpm db:migrate    # needs DATABASE_URL; forward-only SQL files in packages/db/migrations
 pnpm test:corpus   # fetches the pinned repos, then identity-checks every file
 pnpm lint
 pnpm typecheck
@@ -65,7 +67,7 @@ pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git
 
 `oxybook-roundtrip` prints `PASS` / `FAIL` / `UNPARSEABLE` / `ERROR` per file. Exit code 1 means an identity failure or a crash. Unparseable is reported and does not fail the command. `pnpm test:corpus` prints a markdown table of every file and fails the test if any parseable file is not identical.
 
-`pnpm dev` starts the app and worker health servers on the host (`PORT` 3000, `HEALTH_PORT` 3001). The app script builds `@oxybook/github` and then runs `tsx watch`, because `apps/server` imports that package from `dist` and the source is TypeScript. `pnpm db:migrate`, `pnpm test:integration`, and `pnpm test:e2e` are not scripts in this tree. `docker compose up --build` builds the same image. The measured container result (app and worker `/healthz`) is in `STATUS.md`, not repeated here.
+`pnpm dev` starts the app and worker health servers on the host (`PORT` 3000, `HEALTH_PORT` 3001). The app script builds `@oxybook/github` and `@oxybook/db` and then runs `tsx watch`, because `apps/server` imports those packages from `dist` and the source is TypeScript. With `OXYBOOK_MIGRATE_ON_START=true` (compose sets it) the app applies migrations before it listens. `pnpm test:integration` and `pnpm test:e2e` are not scripts in this tree. `docker compose up --build` builds the same image. The measured container result (app and worker `/healthz`) is in `STATUS.md`, not repeated here.
 
 ## Conventions
 
@@ -83,4 +85,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- M0's exit is met by the pull request in `STATUS.md`. Do not mark M1 started. Database schema v0 and a manifest-created App are still open and are not that exit sentence. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.
+- M0's exit is met by the pull request in `STATUS.md`. Do not mark M1 started. A manifest-created App is still open and is not that exit sentence. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.

@@ -10,6 +10,23 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: oxybook
+          POSTGRES_PASSWORD: oxybook-ci
+          POSTGRES_DB: oxybook
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U oxybook -d oxybook"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      # packages/db runs its migration test against this database. Without it the suite skips.
+      DATABASE_URL: postgres://oxybook:oxybook-ci@127.0.0.1:5432/oxybook
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -23,4 +40,5 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+      - run: pnpm db:migrate
       - run: pnpm test:corpus

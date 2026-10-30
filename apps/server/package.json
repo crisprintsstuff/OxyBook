@@ -4,15 +4,16 @@
   "private": true,
   "type": "module",
   "license": "AGPL-3.0-only",
-  "description": "OxyBook API process. M0 exposes /healthz, the GitHub manifest callback, and webhook verification.",
+  "description": "OxyBook API process. M0 exposes /healthz, the GitHub manifest callback, and webhook verification, and runs database migrations on start when asked.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "pnpm --filter @oxybook/github build && tsc -p tsconfig.json --noEmit",
-    "test": "pnpm --filter @oxybook/github build && node --import tsx --test test/*.test.ts",
-    "dev": "pnpm --filter @oxybook/github build && tsx watch src/main.ts",
+    "typecheck": "pnpm --filter @oxybook/github --filter @oxybook/db build && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @oxybook/github --filter @oxybook/db build && node --import tsx --test test/*.test.ts",
+    "dev": "pnpm --filter @oxybook/github --filter @oxybook/db build && tsx watch src/main.ts",
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@oxybook/db": "workspace:*",
     "@oxybook/github": "workspace:*"
   },
   "devDependencies": {
