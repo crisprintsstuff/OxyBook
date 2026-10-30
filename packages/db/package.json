@@ -19,7 +19,7 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --import tsx --test --test-concurrency=1 test/*.test.ts",
-    "migrate": "tsx src/cli.ts"
+    "migrate": "tsx --env-file-if-exists=../../.env src/cli.ts"
   },
   "dependencies": {
     "kysely": "0.29.7",

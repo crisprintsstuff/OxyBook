@@ -11,10 +11,6 @@
       "import": "./dist/index.js"
     }
   },
-  "bin": {
-    "oxybook-roundtrip": "./dist/cli.js",
-    "oxybook-check": "./dist/check-cli.js"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

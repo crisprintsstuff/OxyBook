@@ -18,7 +18,7 @@
     "oxybook-roundtrip": "tsx packages/doc-model/src/cli.ts",
     "oxybook-check": "tsx packages/doc-model/src/check-cli.ts",
     "oxybook-dev": "tsx packages/git-write/src/cli.ts",
-    "oxybook-admin": "pnpm build:libs > .oxybook-build.log 2>&1 || { cat .oxybook-build.log; echo 'build failed: run pnpm install, then try again' >&2; exit 1; } && tsx apps/server/src/admin-cli.ts",
+    "oxybook-admin": "pnpm build:libs > .oxybook-build.log 2>&1 || { cat .oxybook-build.log; echo 'build failed: run pnpm install, then try again' >&2; exit 1; } && tsx --env-file-if-exists=.env apps/server/src/admin-cli.ts",
     "build:libs": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync build",
     "dev": "pnpm build:libs && pnpm --parallel --filter @oxybook/server --filter @oxybook/worker run dev:watch"
   },

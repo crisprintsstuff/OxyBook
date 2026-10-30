@@ -16,7 +16,16 @@ git pull && pnpm install
 pnpm dev
 ```
 
-A new terminal does not have the variables from `.env`. Load them again with `set -a; . ./.env; set +a` and export `DATABASE_URL`. `echo $DATABASE_URL $PORT` shows whether they are set.
+`pnpm dev`, `pnpm oxybook-admin`, and `pnpm db:migrate` read the repository's `.env` themselves, so a new terminal needs no setup. Put `DATABASE_URL=postgres://oxybook:oxybook-dev@127.0.0.1:5432/oxybook` in `.env` (it is in `.env.example`). A variable already set in the shell wins over the file.
+
+If `pnpm dev` fails with `EADDRINUSE` on `PORT` or `HEALTH_PORT`, an earlier server or worker is still running. Find it by port and stop it by pid:
+
+```sh
+sudo ss -ltnp | grep -E ':(3100|3101)\b'   # your PORT and HEALTH_PORT
+kill <pid> <pid>                           # kill -9 if they are still there
+```
+
+`pkill -f "tsx watch src/main.ts"` does not match: the watcher's command line is `.../tsx/dist/cli.mjs watch ...`.
 
 ## Port the tunnel must hit
 
