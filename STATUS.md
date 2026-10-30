@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 complete. M1 in progress: slices 1–4 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces without UI, job queue, sync). The sync half of M1's exit is measured on the owner's machine. The published-site half (slices 5–7) is not started.
+- **Milestone:** M0 complete. M1 in progress: slices 1–5 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces without UI, job queue, sync, renderer v0). The sync half of M1's exit is measured on the owner's machine. The published-site half (slices 6–7) is next.
 - **Last update:** 2026-10-30.
 - **Round-trip (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -14,16 +14,17 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 - **GitHub App:** created from `/setup/github` (manifest flow) and stored encrypted in `github_app` under `OXYBOOK_SECRET_KEY`. `/setup/github` refuses a second App (409). `/api/github/oauth/callback` answers 501 until M2. Webhooks are verified with the stored secret. `ping`, `installation`, `push`, and `pull_request` have all been delivered live. The owner's App is `oxybook-cris`, installed on `oxybook-test`.
 - **Spaces and jobs:** `pnpm oxybook-admin` (`org create`, `space create <org>/<space> --repo owner/repo`, `space list`, `sync <org>/<space> [--now]`, `pages <org>/<space>`, `job ping`). Without `--installation-id`, `space create` looks the installation up as the stored App. Jobs run on pg-boss (schema `pgboss`) through three queues: `ping`, `sync` (one queued per space and ref), and `reconcile` (every 5 minutes).
 - **Sync (`packages/sync`):** a blobless mirror per repo. Each sync compares the whole content-root tree at the branch head with `pages`, in one transaction, and records renames in `inferred_redirects`. A verified `push` to a space's default branch queues a sync (deduplicated in `webhook_deliveries`). `reconcile` catches pushes whose webhook was lost. Measured on the owner's machine with `oxybook-test`: a push with an edit, a rename, and a delete synced with no manual step, and a push with the webhook off was caught by reconciliation.
+- **Renderer (`packages/renderer`):** renders `.md` and `.mdx` to hast and HTML via `doc-model` and `mdast-util-to-hast`, with Shiki syntax highlighting (`github-light`/`github-dark` CSS variables), the M1 allowlist (`Callout`, `Tabs`, `TabItem`, `Card`, `CodeGroup`, `Aside`, `Badge`, `CardGrid`, `Code`, `FileTree`, `Icon`, `LinkButton`, `LinkCard`, `Steps`, `Fragment`, plus `::: code-group`), static props only, visible placeholders and build warnings for everything else, relative link and asset rewriting with broken-link warnings (`strict: true` throws `StrictBuildError`), `oxybook.yml` import mapping (default and named imports), and search-document output (`url, title, description, headings, text, version`). Customer code is never evaluated. On the corpus, warning counts match the slice 1 report 1-for-1 on every file; with the M1 allowlist and `::: code-group`, 353 of 567 corpus files (62.3%) render with no placeholder. On the synced `cris/test` space, 9 of 10 pages render cleanly and `guides/configure.mdx` reports its 2 planted placeholders and 1 planted broken link.
 - **Write path (`packages/git-write`, M0 spike):** `oxybook-dev propose` builds a commit from a temporary index, pushes to `oxybook/*` with `--force-with-lease`, and opens a pull request. It opened oxybook-test#1 (hand-made App) and #2 (manifest-created App), each with a diff of exactly one file. Signed-commit ruleset behaviour is in `docs/M0-GITHUB-SPIKE.md`.
 - **Running it:** on the owner's machine, `pnpm dev` runs app and worker on the host (`PORT=3100`, `HEALTH_PORT=3101`, because Grafana holds 3000), with compose `postgres` and a Cloudflare tunnel `oxybook.boznetwork.com` → `localhost:3100`. Host processes read the repo `.env`. The container image (`docker compose up --build`) also starts and migrates. Steps are in `docs/LIVE-INSTALL.md`.
 - **CI:** `.github/workflows/ci.yml` starts `postgres:17` and runs lint, typecheck, test, `db:migrate`, and `test:corpus`. Database test files run one at a time (see M1-NOTES.md, sharp edge). Results are on the Actions tab.
-- **What does not exist:** renderer, built or published site, theme, search, Caddy serving a space, accounts and sessions, any UI beyond `/setup/github`, editor, drafts. `oxybook.yml` and `_dir.yml` are not read yet. Inferred redirects are recorded and not served. The Git Database API fallback for signed-commit rulesets is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` do not exist. The supported Node is 24; the owner's machine runs 22.23.1 with an engine warning.
+- **What does not exist:** built or published site, theme, search, Caddy serving a space, accounts and sessions, any UI beyond `/setup/github`, editor, drafts. `_dir.yml` is not read yet. Inferred redirects are recorded and not served. The Git Database API fallback for signed-commit rulesets is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` do not exist. The supported Node is 24; the owner's machine runs 22.23.1 with an engine warning.
 
 ## Handoff
 
 For the next session, human or agent.
 
-- **Resume here:** M1 slice 5, renderer v0 (`docs/M1-PLAN.md`). Start from the component list and the findings in `docs/M1-NOTES.md`. Named imports from one module need an import-mapping design change. Text directives (`localhost:8000`) are printed back as text. `code-group` is a container, not JSX. The rendered pages come from `pages`/`blobs` (synced), so `pnpm oxybook-admin pages cris/test` shows what there is to render. The planted broken link in `oxybook-test/docs/guides/configure.mdx` and the unknown `<VersionBadge>` should each produce a build warning.
+- **Resume here:** M1 slice 6, build and serve (`docs/M1-PLAN.md`). `packages/renderer` is done (slice 5). Next is the `build` job (§5.3): render pages from `pages`/`blobs`, read `oxybook.yml` and `_dir.yml` for nav, run Pagefind, write the build dir, assemble hardlinked release, atomically swap the `current` symlink, maintain `by-host` links, and serve `<space>.docs.localhost:8080` through Caddy with `app` stopped.
 - **Owner's live setup:** App `oxybook-cris` (App id 5535294, installation 176737174 on `crisprintsstuff/oxybook-test`), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.boznetwork.com`, `PORT=3100`, `HEALTH_PORT=3101`, and `DATABASE_URL`. The App's webhook was switched off for the reconciliation test and should be back on. Check with the owner.
 - **After every pull:** `git pull && pnpm install`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own.
 - **Working conventions in this repo:** a branch, then a PR; CI must be green on both the push and the pull_request run before merging. A dated changelog entry goes below for anything measured; write "unverified" when it was not run.
@@ -57,22 +58,45 @@ Still unverified. These are not the exit sentence, and they are not done:
 - **OAuth callback path.** Closed 2026-10-30: `/api/github/oauth/callback` answers 501 `Sign in with GitHub is not implemented yet`. Sign in with GitHub is M2.
 - **Installation id.** Closed 2026-10-30: `GITHUB_APP_INSTALLATION_ID`, read by the CLI. The flag wins.
 - **`pnpm test:integration` and `pnpm test:e2e`.** Not implemented.
-- **Editor, renderer, and published site.** Not started.
+- **Editor and published site.** Not started (`packages/renderer` is done; build/serve is M1 slice 6, editor is M2).
 
 ## M1 next
 
-In progress. `docs/M1-PLAN.md` puts the scope below in order. Slices 1–4 are done, and slice 4's exit check passed on the owner's machine. Next is slice 5, renderer v0. From `docs/MVP.md`, with where each item stands:
+In progress. `docs/M1-PLAN.md` puts the scope below in order. Slices 1–5 are done, and slice 4's exit check passed on the owner's machine. Next is slice 6, build and serve. From `docs/MVP.md`, with where each item stands:
 
 - Accounts (email/password, sessions), organisations, spaces, Admin role. *Orgs and spaces exist through `oxybook-admin` (slice 2); accounts, sessions, and roles are slice 8.*
 - GitHub App install flow in the UI; repo connection with access check; webhook sync + reconciliation; read model in PostgreSQL. *Webhook sync, reconciliation, and the read model are done (slice 4); the install flow in the UI is slice 8.*
-- Renderer: mdast→hast handlers, allowlisted components (Callout, Tabs/TabItem, Card, CodeGroup to start; final list from the H3 report), Shiki, link rewriting and broken-link warnings, import mapping. *Slice 5, next. The H3 report is done.*
-- Build job, release assembly with hardlinks, atomic swap; `by-host` symlinks; Caddy serving `<space>.docs.localhost` in dev. *Slice 6.*
+- Renderer: mdast→hast handlers, allowlisted components (Callout, Tabs/TabItem, Card, CodeGroup to start; final list from the H3 report), Shiki, link rewriting and broken-link warnings, import mapping. *Done in `packages/renderer` (slice 5).*
+- Build job, release assembly with hardlinks, atomic swap; `by-host` symlinks; Caddy serving `<space>.docs.localhost` in dev. *Slice 6, next.*
 - Default theme v0, sidebar from tree + `_dir.yml`, Pagefind. *Slice 7.*
-- `oxybook check` compatibility CLI; corpus rendering report. *`oxybook-check` and the corpus report are done (slice 1); a rendering report comes with slice 5.*
+- `oxybook check` compatibility CLI; corpus rendering report. *`oxybook-check` and the corpus report are done (slice 1); the corpus rendering verification is in `packages/renderer` (slice 5).*
 
 **Done when:** connecting a test repo yields a published site with working nav and search; a push to the default branch (including a rename and a delete) is reflected on the site with no manual step; a dropped webhook is caught by reconciliation; stopping `app` does not take the published site down.
 
 ## Changelog
+
+### 2026-10-30 — M1 slice 5: renderer v0 (`packages/renderer`)
+
+Base was `main` at `f4140bab9415be286d11f9bd49e2c51304d8dafc` (#22).
+
+- **`packages/renderer` (AGPL-3.0-only).**
+  - `renderPage` / `renderPageSync`: parses `.md` and `.mdx` once with `@oxybook/doc-model`, transforms mdast to hast with `mdast-util-to-hast` custom handlers, and serializes to HTML with `hast-util-to-html`. Unparseable files degrade to `<pre class="oxybook-unparseable">` with an `unparseable` warning instead of crashing.
+  - **Built-in components and allowlist (`DEFAULT_ALLOWLIST`).** Finalizes the M1 list recommended in `docs/M1-NOTES.md`: `Callout`, `Tabs`, `TabItem`, `Card`, `CodeGroup`, `Aside` (rendered as Callout), `Badge`, `CardGrid`, `Code`, `FileTree`, `Icon`, `LinkButton`, `LinkCard`, `Steps`, and `Fragment`, plus `::: code-group` (`DEFAULT_DIRECTIVES`) and GitHub alerts (`> [!NOTE]`, `> [!TIP]`, `> [!IMPORTANT]`, `> [!WARNING]`, `> [!CAUTION]`).
+  - **Static props and placeholders.** Only static attributes (strings, booleans, and JSON-literal expressions parsed via `JSON.parse`) are accepted. Non-static attributes (`dynamic-props`), unknown JSX components (`unknown-component`), non-comment `{expressions}` (`expression`), ESM `export` statements (`export`), and unknown leaf/container directives (`directive`) render as `<div|span class="oxybook-placeholder">` and emit `file:line` warnings. `{/* comments */}` are dropped; `:name` text directives (`localhost:8000`, `4.5:1`) are printed back as literal source text.
+  - **Import mapping (`config.ts`).** `parseOxybookConfig` reads `oxybook.yml` and `resolveImports` statically maps both default imports (`"@theme/Tabs": Tabs`) and named module exports (`"@astrojs/starlight/components": { Aside: Callout, Steps: Steps }`) to built-in components without evaluating ESM.
+  - **Relative links and assets (`links.ts`).** `resolvePageLink` and `resolveAssetLink` rewrite relative `.md`/`.mdx` links and image/asset paths to site URLs (respecting `slug:` overrides and optional version prefixes), emit `broken-link` warnings when a page/asset table is supplied and a target is missing, and throw `StrictBuildError` when `strict: true`.
+  - **Shiki (`highlight.ts`).** Dual-theme (`github-light`/`github-dark` CSS variables) build-time highlighting for fenced/indented code blocks and `<Code>` components, with a bounded `(lang, code)` hast cache and plain `<pre><code>` fallback for unknown grammars.
+  - **Search document (`searchDoc`).** Emits `{ url, title, description, headings, text, version }` with deduplicated heading `id` slugs (ARCHITECTURE §6).
+- **Root scripts and image.** `pnpm test:corpus` now runs `@oxybook/renderer`'s corpus test after `@oxybook/doc-model`'s identity harness. `build:libs` and `Dockerfile` build `@oxybook/renderer`.
+
+Measured on the owner's machine (Node v22.23.1, Compose `postgres`):
+- `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` (with `.env` `DATABASE_URL`) exited 0: 92 unit tests passing across all packages (8 new in `packages/renderer`).
+- Security test inspects `packages/renderer/src/*.ts` for `eval`, `Function`, `node:vm`, and dynamic `import()`, and runs hostile `.mdx` with `globalThis.eval` and `globalThis.Function` poisoned to throw. Zero customer code is evaluated.
+- `pnpm --filter @oxybook/renderer run test:corpus` rendered all 567 corpus files and 28 fixtures:
+  - With `STARTING_ALLOWLIST` and `allowDirectives: []`, every file's `placeholders` list matched `analyzeSource` from slice 1 identically: 286/567 clean, `unknown-component` 2649, `dynamic-props` 1, `expression` 27, `export` 8, `directive` 9.
+  - With `DEFAULT_ALLOWLIST` and `allowDirectives: []`, every file matched `analyzeSource` with `DEFAULT_ALLOWLIST`: 352/567 clean, `unknown-component` 822, `dynamic-props` 33, `expression` 27, `export` 8, `directive` 9.
+  - With `DEFAULT_ALLOWLIST` and `DEFAULT_DIRECTIVES` (`['code-group']`), 353/567 (62.3%) rendered with zero placeholders (`directive` placeholders dropped from 9 to 3).
+- Against the 10 synced pages of `cris/test` (`b8058130b7d5` in PostgreSQL) with `oxybook-test`'s `oxybook.yml`: 9 of 10 pages rendered with 0 placeholders and 0 broken links, and `/guides/configure` (`guides/configure.mdx`) rendered `<Tabs>`/`<TabItem>`, rewrote `../reference/commands.md` to `/reference/commands`, and reported the 2 planted placeholders (`20:expression:3000`, `22:unknown-component:VersionBadge`) and 1 planted broken link (`26:broken-link:../reference/settings.md`).
 
 ### 2026-10-30 — Status consolidated; `.env` loading checked on the owner's machine
 

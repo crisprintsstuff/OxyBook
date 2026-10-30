@@ -2,7 +2,7 @@
 
 A self-hostable documentation platform where the git repository is the source of truth. Writers use a block editor; every change becomes a pull request in your GitHub repository; merged changes publish a versioned documentation site.
 
-> **Status: early development, no release.** The round-trip library, the GitHub App setup, and the sync from a repository into PostgreSQL work. There is no renderer, published site, editor, or account system yet. [STATUS.md](STATUS.md) says exactly what works and what was measured. The feature list below is what v1 will ship, not what exists today.
+> **Status: early development, no release.** The round-trip library, the GitHub App setup, the sync from a repository into PostgreSQL, and the markdown/MDX renderer work. There is no published site, editor, or account system yet. [STATUS.md](STATUS.md) says exactly what works and what was measured. The feature list below is what v1 will ship, not what exists today.
 
 ## Pitch
 

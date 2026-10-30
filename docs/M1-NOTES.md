@@ -99,3 +99,27 @@ Date: 2026-10-30. Details and numbers are in `STATUS.md`.
 ### Sharp edge: migrations and concurrent schema drops
 
 Kysely's migrator checks for its bookkeeping table with `introspector.getTables()`, which scans every schema in the database and calls `has_schema_privilege` on each. When another session drops a schema during that scan, the migration fails with `schema "<someone else's schema>" does not exist` (SQLSTATE 3F000). Measured 2026-10-30: 21 of 40 migrations failed while a second connection created and dropped schemas in a loop. CI hit this once on #20, because test files in one package ran in parallel, and each creates and drops a throwaway schema. Packages that use the database now run their test files with `--test-concurrency=1`. In production nothing drops schemas while the app starts. If something ever does, migrate-on-start will fail with that message, and a restart will succeed.
+
+## Renderer v0 (slice 5)
+
+Date: 2026-10-30. Node v22.23.1. Details and test numbers are in `STATUS.md`.
+
+### Final M1 built-in component list
+
+`DEFAULT_ALLOWLIST` in `packages/renderer`:
+- Starting allowlist (`STARTING_ALLOWLIST`): `Callout`, `Tabs`, `TabItem`, `Card`, `CodeGroup`.
+- Starlight built-ins and pass-through from slice 1's recommendation: `Aside` (rendered as Callout), `Badge`, `CardGrid`, `Code` (highlighted via Shiki), `FileTree`, `Icon`, `LinkButton`, `LinkCard`, `Steps`, `Fragment`.
+- Non-callout container directive (`DEFAULT_DIRECTIVES`): `::: code-group` (VitePress code groups).
+
+### Corpus rendering verification
+
+`pnpm --filter @oxybook/renderer run test:corpus` (also part of `pnpm test:corpus`) renders all 567 corpus files and 28 adversarial fixtures:
+- With `STARTING_ALLOWLIST` and `allowDirectives: []`, every file's `placeholders` list matches `analyzeSource` from slice 1 identically: 286/567 clean (50.4%), `unknown-component` 2649, `dynamic-props` 1, `expression` 27, `export` 8, `directive` 9.
+- With `DEFAULT_ALLOWLIST` and `allowDirectives: []`, every file's `placeholders` list matches `analyzeSource` with `DEFAULT_ALLOWLIST` identically: 352/567 clean (62.1%), `unknown-component` 822, `dynamic-props` 33, `expression` 27, `export` 8, `directive` 9.
+- With `DEFAULT_ALLOWLIST` and `DEFAULT_DIRECTIVES` (`['code-group']`), **353 of 567 (62.3%)** corpus files render with zero placeholders (`directive` placeholders drop from 9 in 4 files to 3 in 2 files; one of the two VitePress files with `::: code-group` also uses `::: v-pre`).
+
+### Live test repo (`crisprintsstuff/oxybook-test`)
+
+Rendered the 10 synced pages of `cris/test` at `b8058130b7d5a9da6dc0646bf29e15fce32b3d58` from PostgreSQL (`pages` + `blobs`) with `oxybook-test`'s `oxybook.yml` (`"@theme/Tabs": Tabs`, `"@theme/TabItem": TabItem`):
+- 9 of 10 pages render with 0 placeholders and 0 broken links.
+- `/guides/configure` (`guides/configure.mdx`) renders `<Tabs>`/`<TabItem>`, drops the `{/* ... */}` comment, rewrites `../reference/commands.md` to `/reference/commands`, and reports the 2 planted placeholders (`20:expression:3000`, `22:unknown-component:VersionBadge`) and 1 planted broken link (`26:broken-link:../reference/settings.md` → `reference/settings.md`).

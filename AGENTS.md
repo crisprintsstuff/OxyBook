@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is in progress: slices 1–4 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync), and the sync half of M1's exit is measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 5, the renderer. There is no renderer, built site, theme, search, accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 is complete. M1 is in progress: slices 1–5 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0), and the sync half of M1's exit is measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 6, build and serve. There is no built site, theme, search, accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
@@ -40,6 +40,7 @@ packages/git-write      AGPL   blobless mirror, commit from a temporary index, p
 packages/db             AGPL   schema v0 as plain SQL migrations, Kysely types and connection, migrator.
 packages/jobs           AGPL   job queue on PostgreSQL (pg-boss): queue names, payload types, send/work.
 packages/sync           AGPL   read path: blobless mirror, page rules (URLs, titles), sync into blobs/pages/ref_state.
+packages/renderer      AGPL   mdast to hast/HTML, allowlisted components with static props, Shiki, link rewriting, import mapping.
 corpus/manifest.json          pinned doc repos (SHA + sparse path).
 corpus/fixtures               adversarial markdown, committed.
 corpus/cache                  fetched repos. Gitignored. Do not commit.
@@ -50,7 +51,7 @@ docs/M0-NOTES.md              measured results and design corrections.
 docs/M0-GITHUB-SPIKE.md       what the GitHub spike verified, and what it did not.
 ```
 
-`packages/renderer`, `packages/sdk`, and `apps/editor` are in the architecture and are not in the tree.
+`packages/sdk`, `packages/theme-default`, and `apps/editor` are in the architecture and are not in the tree.
 
 ## How to run it
 

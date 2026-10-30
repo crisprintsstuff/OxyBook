@@ -1,5 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
+export { CALLOUTS, parseCalloutOpener } from './callouts.js';
+export {
+  analyzeFile,
+  analyzeSource,
+  type CompatSummary,
+  type FileCompat,
+  formatPlaceholders,
+  formatSummary,
+  type Placeholder,
+  type PlaceholderReason,
+  ranked,
+  STARTING_ALLOWLIST,
+  summarize,
+} from './compat.js';
 export { insertIntoTextSpan, listPlainTextSpans, reformatBlock } from './edit.js';
 export { type ScalarValue, setFrontmatterScalar } from './frontmatter.js';
 export { checkIdentity, divergence } from './identity.js';
