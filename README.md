@@ -2,7 +2,7 @@
 
 A self-hostable documentation platform where the git repository is the source of truth. Writers use a block editor; every change becomes a pull request in your GitHub repository; merged changes publish a versioned documentation site.
 
-> **Status: pre-code.** This repository holds the founding design documents. No release exists yet. The feature list below separates what v1 will ship from what comes later; nothing is claimed to work until it is in a tagged release.
+> **Status: early development, no release.** The round-trip library, the GitHub App setup, and the sync from a repository into PostgreSQL work. There is no renderer, published site, editor, or account system yet. [STATUS.md](STATUS.md) says exactly what works and what was measured. The feature list below is what v1 will ship, not what exists today.
 
 ## Pitch
 
@@ -65,14 +65,14 @@ docker compose up -d
 docker compose ps            # wait until every service reports "healthy"
 ```
 
-Then:
+What that gives you today:
 
-- Open <http://app.localhost:8080>, create the first admin account, and use the setup screen to create a GitHub App (GitHub's App Manifest flow fills in permissions and webhook settings).
-- GitHub cannot deliver webhooks to `localhost`. Create a channel at <https://smee.io>, put its URL in `.env` as `SMEE_URL` and as the app's webhook URL, then run `docker compose --profile webhooks up -d`.
-- Create a space, connect a repository and content directory. The site is served at `http://<space-slug>.docs.localhost:8080`.
-- Outgoing email (invites, password reset) is captured by Mailpit at <http://localhost:8025>.
+- `app` (API and GitHub webhooks) and `worker` (jobs and sync) report healthy. Migrations run when `app` starts.
+- `/setup/github` creates a GitHub App with the App Manifest flow and stores its credentials, encrypted under `OXYBOOK_SECRET_KEY`. GitHub must reach the app over HTTPS to deliver webhooks: use a tunnel, as described in [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md), or the `webhooks` compose profile with a smee.io channel.
+- Spaces are created with `pnpm oxybook-admin space create <org>/<space> --repo owner/repo` (see LIVE-INSTALL.md). A push to the space's branch then syncs its pages into PostgreSQL. `pnpm oxybook-admin pages <org>/<space>` lists them.
+- Not yet: an admin account, a space screen, a published site at `http://<space-slug>.docs.localhost:8080`, and email. Those come in M1 and M2 ([docs/M1-PLAN.md](docs/M1-PLAN.md)).
 
-> Until the OxyBook application image exists, `app` and `worker` in `docker-compose.yml` reference a placeholder image (`localhost/oxybook:dev`) and will not start. `docker compose up -d postgres caddy mailpit` brings up the infrastructure.
+For development on the host instead of in containers (`pnpm dev`), see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md).
 
 Stop with `docker compose down`. Add `-v` to delete volumes; `pgdata` holds accounts and unproposed drafts.
 
