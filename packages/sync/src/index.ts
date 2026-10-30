@@ -11,7 +11,17 @@ export {
   remoteHead,
   type TreeEntry,
 } from './mirror.js';
-export { isPagePath, type PageMeta, pageMeta, pageUrl, relativeToRoot } from './pages.js';
+export {
+  isAssetPath,
+  isDirConfigPath,
+  isExcluded,
+  isPagePath,
+  type PageMeta,
+  pageMeta,
+  pageUrl,
+  parseExcludeList,
+  relativeToRoot,
+} from './pages.js';
 export {
   findStaleSpaces,
   type ReconcileOutcome,

@@ -82,7 +82,7 @@ services:
         condition: service_healthy
     volumes:
       # Read-only: the app serves build logs/previews but never writes sites.
-      - sites:/srv/sites:ro
+      - ${OXYBOOK_SITES_VOLUME:-sites}:/srv/sites:ro
       # Optional: mount a GitHub App private key file and set GITHUB_APP_PRIVATE_KEY_FILE.
       # - ./secrets/github-app.pem:/run/secrets/github-app.pem:ro
     expose:
@@ -115,7 +115,7 @@ services:
     volumes:
       # Writable: builds, release assembly (hardlinks require one filesystem) and
       # by-host symlinks all live under /srv/sites.
-      - sites:/srv/sites
+      - ${OXYBOOK_SITES_VOLUME:-sites}:/srv/sites
       # Cache of blobless partial clones; safe to delete.
       - mirrors:/var/lib/oxybook/mirrors
     healthcheck:
@@ -129,11 +129,11 @@ services:
     image: caddy:2
     restart: unless-stopped
     ports:
-      - "8080:80"
+      - "${CADDY_PORT:-8080}:80"
     volumes:
       - ./deploy/caddy/Caddyfile.dev:/etc/caddy/Caddyfile:ro
       # Read-only: Caddy only serves what the worker built.
-      - sites:/srv/sites:ro
+      - ${OXYBOOK_SITES_VOLUME:-sites}:/srv/sites:ro
       - caddy_data:/data
       - caddy_config:/config
     healthcheck:

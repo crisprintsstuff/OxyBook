@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
@@ -100,6 +100,7 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
       tokenFor: async () => undefined,
       githubUrl: `file://${path.join(tmp, 'hub')}`,
       mirrorsDir: path.join(tmp, 'mirrors'),
+      sitesDir: path.join(tmp, 'sites'),
       reconcileCron: 'off',
     });
     stopWorker = worker.stop;
@@ -119,14 +120,33 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
     rmSync(tmp, { recursive: true, force: true });
   });
 
-  it('a sync job brings pages in line with the branch', async () => {
+  it('a sync job brings pages in line with the branch and builds the site', async () => {
     const id = await app.send('sync', { spaceId, ref: 'main', reason: 'manual' });
     assert.ok(id);
     await until(async () => (await app.state('sync', id)) === 'completed');
     assert.deepEqual(await paths(), ['index.md']);
+
+    const siteHome = path.join(
+      tmp,
+      'sites',
+      'by-host',
+      'docs.docs.localhost',
+      'current',
+      'index.html',
+    );
+    await until(async () => existsSync(siteHome));
+    assert.match(readFileSync(siteHome, 'utf8'), /<h1 id="home">Home<\/h1>/);
+    const buildRow = await db
+      .selectFrom('builds')
+      .select(['status', 'version'])
+      .where('space_id', '=', spaceId)
+      .orderBy('created_at', 'desc')
+      .executeTakeFirstOrThrow();
+    assert.equal(buildRow.status, 'succeeded');
+    assert.equal(buildRow.version, 'default');
   });
 
-  it('reconcile catches a push whose webhook never arrived', async () => {
+  it('reconcile catches a push whose webhook never arrived and rebuilds the site', async () => {
     writeFileSync(path.join(work, 'docs/missed.md'), '# Missed\n');
     git(work, 'add', '-A');
     git(work, 'commit', '--quiet', '-m', 'no webhook for this one');
@@ -139,5 +159,16 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
     const state = await db.selectFrom('ref_state').select('head_sha').executeTakeFirstOrThrow();
     assert.equal(state.head_sha, head);
     assert.ok(lines.some((line) => line.includes('reconcile space') && line.includes('sync')));
+
+    const missedHtml = path.join(
+      tmp,
+      'sites',
+      'by-host',
+      'docs.docs.localhost',
+      'current',
+      'missed.html',
+    );
+    await until(async () => existsSync(missedHtml));
+    assert.match(readFileSync(missedHtml, 'utf8'), /<h1 id="missed">Missed<\/h1>/);
   });
 });

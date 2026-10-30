@@ -48,7 +48,12 @@ export function emptyOxybookConfig(): OxybookConfig {
 export function parseOxybookConfig(yamlSource: string): OxybookConfig {
   const config = emptyOxybookConfig();
   if (!yamlSource.trim()) return config;
-  const parsed = parseYaml(yamlSource) as unknown;
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(yamlSource);
+  } catch {
+    return config;
+  }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return config;
   }
@@ -162,4 +167,57 @@ export function resolveImports(
   }
 
   return localToTarget;
+}
+
+function globToRegExp(pattern: string): RegExp {
+  let out = '^';
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i] ?? '';
+    if (ch === '*') {
+      if (pattern[i + 1] === '*') {
+        if (pattern[i + 2] === '/') {
+          out += '(?:.*/)?';
+          i += 2;
+        } else {
+          out += '.*';
+          i++;
+        }
+      } else {
+        out += '[^/]*';
+      }
+    } else if (ch === '?') {
+      out += '[^/]';
+    } else if (/[.+^${}()|[\]\\]/.test(ch)) {
+      out += `\\${ch}`;
+    } else {
+      out += ch;
+    }
+  }
+  out += '(?:/.*)?$';
+  return new RegExp(out);
+}
+
+/**
+ * Whether `relPath` (relative to the content root) is excluded by `oxybook.yml` `exclude:`
+ * patterns (ARCHITECTURE §2.2). Supports exact paths, directory prefixes, and `*` / `**` globs.
+ */
+export function isExcluded(
+  relPath: string,
+  excludePatterns: readonly string[] | undefined,
+): boolean {
+  if (!excludePatterns || excludePatterns.length === 0) return false;
+  const cleanRel = relPath.replace(/^\/+/, '');
+  for (const raw of excludePatterns) {
+    const pattern = raw
+      .trim()
+      .replace(/^(?:\.\/|\/)+/, '')
+      .replace(/\/+$/, '');
+    if (!pattern) continue;
+    if (pattern.includes('*') || pattern.includes('?')) {
+      if (globToRegExp(pattern).test(cleanRel)) return true;
+    } else if (cleanRel === pattern || cleanRel.startsWith(`${pattern}/`)) {
+      return true;
+    }
+  }
+  return false;
 }

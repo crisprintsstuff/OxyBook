@@ -209,4 +209,19 @@ describe('sync', { skip: url ? false : 'DATABASE_URL is not set' }, () => {
     assert.deepEqual(result.skipped, [{ path: 'zz.md', reason: 'URL /c is already used by c.md' }]);
     assert.ok(lines.some((line) => line.includes('sync skipped zz.md')));
   });
+
+  it('omits pages matched by exclude in oxybook.yml', async () => {
+    write(work, {
+      'oxybook.yml': 'exclude:\n  - secret\n  - "*.wip.md"\n',
+      'docs/secret/hidden-doc.md': '# Secret\n',
+      'docs/draft.wip.md': '# Draft\n',
+    });
+    git(work, 'add', '-A');
+    git(work, 'commit', '--quiet', '-m', 'exclude');
+    git(work, 'push', '--quiet', remote, 'main');
+    await syncSpace(db, target, source);
+    const stored = await pagesInDb();
+    assert.ok(!stored.includes('secret/hidden-doc.md'));
+    assert.ok(!stored.includes('draft.wip.md'));
+  });
 });

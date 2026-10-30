@@ -18,6 +18,7 @@ export interface Database {
   github_app: GithubAppTable;
   webhook_deliveries: WebhookDeliveriesTable;
   inferred_redirects: InferredRedirectsTable;
+  builds: BuildsTable;
 }
 
 type CreatedAt = ColumnType<Date, Date | string | undefined, never>;
@@ -171,4 +172,20 @@ export interface InferredRedirectsTable {
   to_path: string;
   commit_sha: string;
   created_at: CreatedAt;
+}
+
+export type BuildStatus = 'running' | 'succeeded' | 'failed';
+
+export interface BuildsTable {
+  id: Generated<string>;
+  org_id: string;
+  space_id: string;
+  version: string;
+  ref: string;
+  commit_sha: string;
+  status: BuildStatus;
+  warning_count: Generated<number>;
+  log: Generated<string>;
+  created_at: CreatedAt;
+  finished_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
 }

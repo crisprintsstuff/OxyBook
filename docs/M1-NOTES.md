@@ -94,7 +94,7 @@ Date: 2026-10-30. Details and numbers are in `STATUS.md`.
 - **§4.2 step 2, `git diff --name-status -M <from> <to>`.** Sync does not apply that diff. It lists the content root at the new head (`git ls-tree`, trees only, no blobs) and compares the result with the stored `pages` rows. A diff needs `from` in the mirror and assumes the stored rows match `from`. Neither holds after a deleted mirror, a force-push, or a sync that failed halfway. The full comparison costs one tree listing and gives the same answer, so reconciliation can call the same function. `git diff -M` is still used, for renames only.
 - **§4.2 `blobs(sha PK, bytes)`.** Keyed by `(org_id, sha)` since schema v0 (see M0-NOTES.md).
 - **§2.5 inferred redirects.** The text does not say where they are kept. They are in `inferred_redirects`, keyed by `(space_id, ref, from_url)`, until slice 6 serves them and an admin commits them to `oxybook.yml`.
-- **§2.2 `exclude:` in `oxybook.yml`.** Not applied by sync yet. `oxybook.yml` is not read until the build (slice 6).
+- **§2.2 `exclude:` in `oxybook.yml`.** Applied by both `syncSpace` and `buildSiteVersion` (slice 6).
 
 ### Sharp edge: migrations and concurrent schema drops
 
@@ -123,3 +123,13 @@ Date: 2026-10-30. Node v22.23.1. Details and test numbers are in `STATUS.md`.
 Rendered the 10 synced pages of `cris/test` at `b8058130b7d5a9da6dc0646bf29e15fce32b3d58` from PostgreSQL (`pages` + `blobs`) with `oxybook-test`'s `oxybook.yml` (`"@theme/Tabs": Tabs`, `"@theme/TabItem": TabItem`):
 - 9 of 10 pages render with 0 placeholders and 0 broken links.
 - `/guides/configure` (`guides/configure.mdx`) renders `<Tabs>`/`<TabItem>`, drops the `{/* ... */}` comment, rewrites `../reference/commands.md` to `/reference/commands`, and reports the 2 planted placeholders (`20:expression:3000`, `22:unknown-component:VersionBadge`) and 1 planted broken link (`26:broken-link:../reference/settings.md` → `reference/settings.md`).
+
+## Build and serve (slice 6)
+
+Date: 2026-10-30. Node v22.23.1. Details and measurements are in `STATUS.md`.
+
+### Where ARCHITECTURE.md is thin
+
+- **§5.3 directory index pages and Caddy `try_files`.** `Caddyfile.dev` uses `try_files {path} {path}.html {path}/index.html`. When a page URL such as `/guides` also has a directory `guides/` on disk (because `guides/install.html` and `guides/images/stack.svg` live inside it), `{path}` matches the directory `guides/`, so Caddy's `file_server` looks for `guides/index.html`. `buildSiteVersion` writes `guides.html` and hardlinks `guides/index.html` to `guides.html` whenever a sibling directory `guides/` exists, so both `/guides` and `/guides/` return 200 with zero duplicated bytes while leaf pages (`/getting-started`, `/guides/install`) are served from `<path>.html` with no trailing-slash redirect.
+- **§5.3 redirects when `app` is stopped.** Explicit `redirects:` in `oxybook.yml` and `inferred_redirects` rows from `git diff -M` are emitted as static HTML redirect files (`<meta http-equiv="refresh">`, `<link rel="canonical">`, `location.replace`) without `data-pagefind-body`, so redirects work when `app` is stopped (invariant 4) and are not indexed by Pagefind.
+- **Port 8080 on the owner's machine.** `qBittorrent` holds port 8080 on the owner's Windows/WSL2 host, which prevented Docker from binding `8080:80` on `caddy`. `docker-compose.yml` now parameterizes the host port as `${CADDY_PORT:-8080}:80` (with `CADDY_PORT=8180` in the owner's `.env`) and the sites volume as `${OXYBOOK_SITES_VOLUME:-sites}:/srv/sites` (`./.oxybook-sites` in `.env` so host `pnpm dev` / `oxybook-admin` builds are served directly by the compose `caddy` container).

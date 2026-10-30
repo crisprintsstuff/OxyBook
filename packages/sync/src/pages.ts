@@ -17,6 +17,88 @@ export function isPagePath(relPath: string): boolean {
     .every((segment) => !segment.startsWith('_') && !segment.startsWith('.'));
 }
 
+/** Non-page file under content root with no path segment starting with `_` or `.` (§2.2). */
+export function isAssetPath(relPath: string): boolean {
+  if (/\.mdx?$/i.test(relPath)) return false;
+  return relPath
+    .split('/')
+    .every((segment) => segment !== '' && !segment.startsWith('_') && !segment.startsWith('.'));
+}
+
+/** `_dir.yml` inside a non-ignored directory under content root (§2.2–2.3). */
+export function isDirConfigPath(relPath: string): boolean {
+  const parts = relPath.split('/');
+  const base = parts.pop();
+  if (base !== '_dir.yml') return false;
+  return parts.every((segment) => !segment.startsWith('_') && !segment.startsWith('.'));
+}
+
+function globToRegExp(pattern: string): RegExp {
+  let out = '^';
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i] ?? '';
+    if (ch === '*') {
+      if (pattern[i + 1] === '*') {
+        if (pattern[i + 2] === '/') {
+          out += '(?:.*/)?';
+          i += 2;
+        } else {
+          out += '.*';
+          i++;
+        }
+      } else {
+        out += '[^/]*';
+      }
+    } else if (ch === '?') {
+      out += '[^/]';
+    } else if (/[.+^${}()|[\]\\]/.test(ch)) {
+      out += `\\${ch}`;
+    } else {
+      out += ch;
+    }
+  }
+  out += '(?:/.*)?$';
+  return new RegExp(out);
+}
+
+/** Whether `relPath` is matched by `exclude:` in `oxybook.yml` (§2.2). */
+export function isExcluded(
+  relPath: string,
+  excludePatterns: readonly string[] | undefined,
+): boolean {
+  if (!excludePatterns || excludePatterns.length === 0) return false;
+  const cleanRel = relPath.replace(/^\/+/, '');
+  for (const raw of excludePatterns) {
+    const pattern = raw
+      .trim()
+      .replace(/^(?:\.\/|\/)+/, '')
+      .replace(/\/+$/, '');
+    if (!pattern) continue;
+    if (pattern.includes('*') || pattern.includes('?')) {
+      if (globToRegExp(pattern).test(cleanRel)) return true;
+    } else if (cleanRel === pattern || cleanRel.startsWith(`${pattern}/`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Extract `exclude:` string list from raw `oxybook.yml` bytes without throwing. */
+export function parseExcludeList(bytes: Buffer): string[] {
+  try {
+    const parsed = parseYaml(bytes.toString('utf8')) as unknown;
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      const raw = (parsed as Record<string, unknown>).exclude;
+      if (Array.isArray(raw)) {
+        return raw.filter((item): item is string => typeof item === 'string');
+      }
+    }
+  } catch {
+    // Ignore malformed oxybook.yml.
+  }
+  return [];
+}
+
 /** Path relative to the content root, or null when the file is outside it. */
 export function relativeToRoot(repoPath: string, root: string): string | null {
   if (!root) return repoPath;

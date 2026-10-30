@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is in progress: slices 1–5 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0), and the sync half of M1's exit is measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 6, build and serve. There is no built site, theme, search, accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 is complete. M1 is in progress: slices 1–6 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve), and both the sync half and the Caddy build-and-serve check of M1's exit are measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 7, default theme v0 (`packages/theme-default`). There is no standalone theme package, accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
@@ -40,7 +40,7 @@ packages/git-write      AGPL   blobless mirror, commit from a temporary index, p
 packages/db             AGPL   schema v0 as plain SQL migrations, Kysely types and connection, migrator.
 packages/jobs           AGPL   job queue on PostgreSQL (pg-boss): queue names, payload types, send/work.
 packages/sync           AGPL   read path: blobless mirror, page rules (URLs, titles), sync into blobs/pages/ref_state.
-packages/renderer      AGPL   mdast to hast/HTML, allowlisted components with static props, Shiki, link rewriting, import mapping.
+packages/renderer      AGPL   mdast to hast/HTML, allowlisted components with static props, Shiki, link rewriting, import mapping, _dir.yml nav, Pagefind, static site build and release assembly.
 corpus/manifest.json          pinned doc repos (SHA + sparse path).
 corpus/fixtures               adversarial markdown, committed.
 corpus/cache                  fetched repos. Gitignored. Do not commit.
@@ -68,6 +68,7 @@ pnpm build
 pnpm oxybook-roundtrip <file-or-directory>
 pnpm oxybook-admin space list   # org/space setup without UI; `job ping` round-trips the queue
 pnpm oxybook-admin sync <org>/<space> [--now]   # queue (or run here) a sync; `pages <org>/<space>` lists the result
+pnpm oxybook-admin build <org>/<space> [--now]  # queue (or run here) a static site build into OXYBOOK_SITES_DIR
 pnpm oxybook-check <dir>      # what would render as a placeholder, file:line
 pnpm compat:corpus           # the H3 report over corpus/cache; run test:corpus first
 pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git

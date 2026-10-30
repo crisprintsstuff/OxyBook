@@ -2,9 +2,21 @@
 
 export { STARTING_ALLOWLIST } from '@oxybook/doc-model';
 export {
+  atomicSymlink,
+  type BuildAssetInput,
+  type BuildPageInput,
+  type BuildVersionInput,
+  type BuildVersionResult,
+  buildSiteVersion,
+  clearRenderedBodyCache,
+  hardlinkTree,
+  type SiteBuildWarning,
+} from './build.js';
+export {
   type ComponentMap,
   type ComponentMapEntry,
   emptyOxybookConfig,
+  isExcluded,
   type OxybookConfig,
   parseOxybookConfig,
   type RedirectRule,
@@ -28,6 +40,13 @@ export {
   StrictBuildError,
 } from './links.js';
 export {
+  buildNavTree,
+  type DirConfig,
+  type NavItem,
+  type NavPageInput,
+  parseDirConfig,
+} from './nav.js';
+export {
   type BuildWarning,
   DEFAULT_ALLOWLIST,
   DEFAULT_DIRECTIVES,
@@ -41,3 +60,14 @@ export {
   type StaticPropValue,
   type UnparseableWarning,
 } from './render.js';
+export {
+  type BuildEnvironment,
+  runSpaceBuild,
+  type SpaceBuildResult,
+} from './runner.js';
+export {
+  type DocumentHtmlOptions,
+  render404Html,
+  renderDocumentHtml,
+  renderRedirectHtml,
+} from './template.js';

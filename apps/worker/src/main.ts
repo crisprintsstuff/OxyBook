@@ -4,13 +4,16 @@ import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, type Database, type Kysely } from '@oxybook/db';
-import { type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
+import { buildKey, type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
+import { type BuildEnvironment, runSpaceBuild } from '@oxybook/renderer';
 import {
   findStaleSpaces,
   runSpaceSync,
   type SyncEnvironment,
   storedAppTokens,
 } from '@oxybook/sync';
+
+const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
 export interface HealthServer {
   port: number;
@@ -70,8 +73,12 @@ export interface JobWorkerOptions {
   tokenFor?: SyncEnvironment['tokenFor'];
   githubUrl?: string;
   mirrorsDir?: string;
+  sitesDir?: string;
+  sitesDomain?: string;
   /** Cron for reconciliation, or 'off'. Default every 5 minutes. */
   reconcileCron?: string;
+  /** Automatically queue a build after a sync job completes (default true). */
+  buildAfterSync?: boolean;
 }
 
 /**
@@ -93,14 +100,17 @@ export async function startJobWorker(
     options.pollingIntervalSeconds !== undefined
       ? { pollingIntervalSeconds: options.pollingIntervalSeconds }
       : {};
-  const env: SyncEnvironment = {
+  const env: BuildEnvironment = {
     db,
     tokenFor: options.tokenFor ?? storedAppTokens(db, process.env.OXYBOOK_SECRET_KEY),
     githubUrl: options.githubUrl ?? process.env.OXYBOOK_GITHUB_URL ?? 'https://github.com',
     mirrorsDir:
       options.mirrorsDir ??
       process.env.OXYBOOK_MIRRORS_DIR ??
-      path.resolve(process.cwd(), '.oxybook-mirrors'),
+      path.join(REPO_ROOT, '.oxybook-mirrors'),
+    sitesDir:
+      options.sitesDir ?? process.env.OXYBOOK_SITES_DIR ?? path.join(REPO_ROOT, '.oxybook-sites'),
+    sitesDomain: options.sitesDomain ?? process.env.OXYBOOK_SITES_DOMAIN ?? 'docs.localhost',
     log,
   };
 
@@ -120,8 +130,32 @@ export async function startJobWorker(
       );
       try {
         await runSpaceSync(env, spaceId, ref);
+        if (options.buildAfterSync !== false) {
+          const buildJobId = await jobs.send(
+            'build',
+            { spaceId, version: 'default', ref, reason: 'sync' },
+            { singletonKey: buildKey(spaceId, 'default') },
+          );
+          log(`sync ${spaceId} ${ref}: build ${buildJobId ?? 'already queued'}`);
+        }
       } catch (error) {
         log(`job sync ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+    },
+    polling,
+  );
+  await jobs.work(
+    'build',
+    async (job) => {
+      const { spaceId, version, ref, reason } = job.data;
+      log(`job build ${job.id} space ${spaceId} version ${version} ref ${ref} (${reason})`);
+      try {
+        await runSpaceBuild(env, spaceId, { version, ref });
+      } catch (error) {
+        log(
+          `job build ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
         throw error;
       }
     },
@@ -174,7 +208,7 @@ if (invokedDirectly()) {
         return;
       }
       await startJobWorker(process.env.DATABASE_URL);
-      console.log('jobs: working on ping, sync, reconcile');
+      console.log('jobs: working on ping, sync, build, reconcile');
     })
     .catch((error: unknown) => {
       console.error(error);

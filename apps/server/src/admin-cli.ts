@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createDb, type Database, databaseUrlFromEnv, type Kysely } from '@oxybook/db';
-import { startJobs, syncKey } from '@oxybook/jobs';
+import { buildKey, startJobs, syncKey } from '@oxybook/jobs';
+import { runSpaceBuild } from '@oxybook/renderer';
 import { runSpaceSync, storedAppTokens } from '@oxybook/sync';
 import { createOrg, createSpace, listSpaces, lookupInstallation, parseRepo } from './admin.js';
+
+const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
 const USAGE = `usage:
   oxybook-admin org create <slug> [--name <name>]
@@ -12,12 +16,14 @@ const USAGE = `usage:
       [--installation-id <id>] [--content-root docs] [--default-ref main]
   oxybook-admin space list
   oxybook-admin sync <org>/<space> [--now]
+  oxybook-admin build <org>/<space> [--now]
   oxybook-admin pages <org>/<space>
   oxybook-admin job ping
 
 Needs DATABASE_URL. Without --installation-id, space create asks GitHub as the stored App,
-which needs OXYBOOK_SECRET_KEY. sync queues a job for the worker; --now runs it here
-(needs OXYBOOK_SECRET_KEY, mirrors under OXYBOOK_MIRRORS_DIR or ./.oxybook-mirrors).`;
+which needs OXYBOOK_SECRET_KEY. sync and build queue a job for the worker; --now runs it
+here (needs OXYBOOK_SECRET_KEY, mirrors under OXYBOOK_MIRRORS_DIR or ./.oxybook-mirrors,
+sites under OXYBOOK_SITES_DIR or ./.oxybook-sites).`;
 
 async function findSpace(db: Kysely<Database>, target: string | undefined) {
   const [orgSlug, slug] = (target ?? '').split('/');
@@ -121,7 +127,7 @@ export async function main(argv: readonly string[], env = process.env): Promise<
             db,
             tokenFor: storedAppTokens(db, env.OXYBOOK_SECRET_KEY),
             githubUrl: env.OXYBOOK_GITHUB_URL ?? 'https://github.com',
-            mirrorsDir: env.OXYBOOK_MIRRORS_DIR ?? path.resolve('.oxybook-mirrors'),
+            mirrorsDir: env.OXYBOOK_MIRRORS_DIR ?? path.join(REPO_ROOT, '.oxybook-mirrors'),
             log: (line) => console.log(line),
           },
           space.id,
@@ -148,6 +154,39 @@ export async function main(argv: readonly string[], env = process.env): Promise<
           { singletonKey: syncKey(space.id, space.ref) },
         );
         console.log(id ? `queued sync ${id}` : 'a sync for this space is already queued');
+      } finally {
+        await jobs.stop();
+      }
+      return 0;
+    }
+    if (noun === 'build') {
+      const space = await findSpace(db, verb);
+      if (args.includes('--now')) {
+        const result = await runSpaceBuild(
+          {
+            db,
+            tokenFor: storedAppTokens(db, env.OXYBOOK_SECRET_KEY),
+            githubUrl: env.OXYBOOK_GITHUB_URL ?? 'https://github.com',
+            mirrorsDir: env.OXYBOOK_MIRRORS_DIR ?? path.join(REPO_ROOT, '.oxybook-mirrors'),
+            sitesDir: env.OXYBOOK_SITES_DIR ?? path.join(REPO_ROOT, '.oxybook-sites'),
+            sitesDomain: env.OXYBOOK_SITES_DOMAIN ?? 'docs.localhost',
+            log: (line) => console.log(line),
+          },
+          space.id,
+        );
+        console.log(
+          `built ${result.buildId} at ${result.commitSha.slice(0, 12)}: ${result.pageCount} pages, ${result.assetCount} assets, ${result.redirectCount} redirects, ${result.warnings.length} warnings`,
+        );
+        return 0;
+      }
+      const jobs = await startJobs(databaseUrlFromEnv(env), { log: () => {} });
+      try {
+        const id = await jobs.send(
+          'build',
+          { spaceId: space.id, version: 'default', ref: space.ref, reason: 'manual' },
+          { singletonKey: buildKey(space.id, 'default') },
+        );
+        console.log(id ? `queued build ${id}` : 'a build for this space is already queued');
       } finally {
         await jobs.stop();
       }

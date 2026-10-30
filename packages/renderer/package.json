@@ -13,15 +13,17 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "pnpm --filter @oxybook/doc-model --filter @oxybook/sync build && tsc -p tsconfig.json --noEmit",
-    "test": "pnpm --filter @oxybook/doc-model --filter @oxybook/sync build && node --import tsx --test test/*.test.ts",
-    "test:corpus": "pnpm --filter @oxybook/doc-model --filter @oxybook/sync build && node --import tsx --test test/corpus.render.ts"
+    "typecheck": "pnpm --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/sync build && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/sync build && node --import tsx --test --test-concurrency=1 test/*.test.ts",
+    "test:corpus": "pnpm --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/sync build && node --import tsx --test test/corpus.render.ts"
   },
   "dependencies": {
+    "@oxybook/db": "workspace:*",
     "@oxybook/doc-model": "workspace:*",
     "@oxybook/sync": "workspace:*",
     "hast-util-to-html": "9.0.6",
     "mdast-util-to-hast": "13.2.1",
+    "pagefind": "1.5.2",
     "shiki": "4.5.0",
     "yaml": "2.9.1"
   },

@@ -19,17 +19,25 @@ export interface JobPayloads {
     /** The head GitHub reported, for the log. Sync fetches and uses the real head. */
     after?: string;
   };
+  /** Build a published site version at its synced head (ARCHITECTURE §5.3). */
+  build: {
+    spaceId: string;
+    version: string;
+    ref: string;
+    reason: 'sync' | 'manual';
+  };
   /** Compare every space's remote head with ref_state and queue syncs for the ones behind. */
   reconcile: { at?: string };
 }
 
 export type QueueName = keyof JobPayloads;
 
-export const QUEUE_NAMES: readonly QueueName[] = ['ping', 'sync', 'reconcile'];
+export const QUEUE_NAMES: readonly QueueName[] = ['ping', 'sync', 'build', 'reconcile'];
 
 /**
  * `sync` is `stately` with singletonKey `<space>:<ref>`: at most one queued and one active
  * per space and ref, so a burst of pushes collapses into one follow-up sync.
+ * `build` is `stately` with singletonKey `<space>:<version>` (§5.3).
  * `reconcile` is `singleton`: one pass at a time across all workers.
  */
 const QUEUE_OPTIONS: Record<
@@ -38,11 +46,16 @@ const QUEUE_OPTIONS: Record<
 > = {
   ping: {},
   sync: { policy: 'stately', retryLimit: 3, retryDelay: 30, retryBackoff: true },
+  build: { policy: 'stately', retryLimit: 2, retryDelay: 15, retryBackoff: true },
   reconcile: { policy: 'singleton', retryLimit: 0 },
 };
 
 export function syncKey(spaceId: string, ref: string): string {
   return `${spaceId}:${ref}`;
+}
+
+export function buildKey(spaceId: string, version: string): string {
+  return `${spaceId}:${version}`;
 }
 
 /** pg-boss keeps its tables in its own schema, next to OxyBook's. */

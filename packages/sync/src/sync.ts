@@ -2,7 +2,14 @@
 
 import { type Database, type Kysely, sql } from '@oxybook/db';
 import { fetchRef, findRenames, listFiles, readBlobs } from './mirror.js';
-import { isPagePath, pageMeta, pageUrl, relativeToRoot } from './pages.js';
+import {
+  isExcluded,
+  isPagePath,
+  pageMeta,
+  pageUrl,
+  parseExcludeList,
+  relativeToRoot,
+} from './pages.js';
 
 export interface SyncTarget {
   orgId: string;
@@ -60,12 +67,33 @@ export async function syncSpace(
     .executeTakeFirst();
   const from = state?.head_sha ?? null;
 
+  const configEntries = await listFiles(source.mirrorDir, to, 'oxybook.yml');
+  const configEntry = configEntries.find((entry) => entry.path === 'oxybook.yml');
+  let excludePatterns: string[] = [];
+  if (configEntry) {
+    const cachedConfig = await db
+      .selectFrom('blobs')
+      .select('bytes')
+      .where('org_id', '=', target.orgId)
+      .where('sha', '=', configEntry.blob)
+      .executeTakeFirst();
+    const configBytes =
+      cachedConfig?.bytes ??
+      (await readBlobs(source.mirrorDir, [configEntry.blob], source.token)).get(configEntry.blob);
+    if (configBytes) {
+      excludePatterns = parseExcludeList(configBytes);
+    }
+  }
+
   const files = await listFiles(source.mirrorDir, to, target.contentRoot);
   const pageFiles = files
     .map((entry) => ({ ...entry, rel: relativeToRoot(entry.path, target.contentRoot) }))
     .filter(
       (entry): entry is typeof entry & { rel: string } =>
-        entry.rel !== null && isPagePath(entry.rel),
+        entry.rel !== null &&
+        isPagePath(entry.rel) &&
+        !isExcluded(entry.rel, excludePatterns) &&
+        !isExcluded(entry.path, excludePatterns),
     )
     .sort((a, b) => a.rel.localeCompare(b.rel));
   const relPaths = new Set(pageFiles.map((entry) => entry.rel));
