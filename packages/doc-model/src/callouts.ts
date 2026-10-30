@@ -2,7 +2,7 @@
 
 import type { Block, MdastNode, RawKind } from './types.js';
 
-const CALLOUTS = new Set([
+export const CALLOUTS: ReadonlySet<string> = new Set([
   'note',
   'tip',
   'info',
