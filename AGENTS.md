@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is in progress: slices 1–8 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve, default theme v0, accounts and install in the UI), and the sync half, the Caddy build-and-serve check, and the UI signup/repo-connect/sync/build flow of M1's exit are all measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 9, the M1 exit run. There is no editor yet (`apps/editor` is M2). `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 and M1 are complete. All 9 slices of `docs/M1-PLAN.md` (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve, default theme v0, accounts and install in the UI, and the `pnpm m1:exit` exit run) are done and measured on the owner's machine against `crisprintsstuff/oxybook-test`, PostgreSQL, and Caddy. Next is M2 (editor and write path, `docs/MVP.md`). There is no editor yet (`apps/editor` is M2). `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
@@ -70,6 +70,7 @@ pnpm oxybook-roundtrip <file-or-directory>
 pnpm oxybook-admin space list   # org/space setup without UI; `job ping` round-trips the queue
 pnpm oxybook-admin sync <org>/<space> [--now]   # queue (or run here) a sync; `pages <org>/<space>` lists the result
 pnpm oxybook-admin build <org>/<space> [--now]  # queue (or run here) a static site build into OXYBOOK_SITES_DIR
+pnpm m1:exit                  # run the M1 exit verification against the test repo and Caddy
 pnpm oxybook-check <dir>      # what would render as a placeholder, file:line
 pnpm compat:corpus           # the H3 report over corpus/cache; run test:corpus first
 pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git
@@ -98,4 +99,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - Compose builds `Dockerfile` for `app` and `worker`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
 - Code pulled into a running `pnpm dev` does not reload: the watchers ignore `packages/*/dist`. Restart after `git pull && pnpm install`.
 - Database tests share one PostgreSQL. Each file uses a throwaway schema, and files run one at a time, because Kysely's migrator scans every schema (`docs/M1-NOTES.md`).
-- M0's exit is met by the pull request in `STATUS.md`. M1 is in progress; do not mark it done until the exit run in `docs/M1-PLAN.md` slice 9 is recorded. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.
+- M0's and M1's exits are met and recorded in `STATUS.md`. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.

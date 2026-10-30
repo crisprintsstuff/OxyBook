@@ -20,7 +20,7 @@ Measure before building, then build the read path end to end with no UI, then pu
 | 6 | **Done 2026-10-30, measured on the owner's machine.** **Build and serve.** Build job (§5.3): render pages, `_dir.yml` nav, Pagefind, write the build dir, hardlinked release, atomic `current` symlink swap, `by-host` links. Caddy serves `<space>.docs.localhost`. | `curl http://<space>.docs.localhost:8080/` returns the test repo's home page, with `app` stopped. | 4, 5 |
 | 7 | **Done 2026-10-30.** **Default theme v0.** Layout, sidebar from tree plus `_dir.yml`, search UI over Pagefind. Apache-2.0 (`packages/theme-default`). | Nav and search work in a browser on the test site. | 6 |
 | 8 | **Done 2026-10-30, measured on the owner's machine.** **Accounts and install in the UI.** Email/password (argon2id), server-side sessions, org and space creation, Admin role, GitHub App install flow and repo connection with the access check from §4.1. | A new user signs up, connects the test repo, and gets the same site as slice 6 without the dev CLI. | 2, 4, 6 |
-| 9 | **M1 exit run.** A script that does the exit sentence against the test repo and records the results in `STATUS.md`. | The exit sentence, measured. | all |
+| 9 | **Done 2026-10-30, measured on the owner's machine.** **M1 exit run.** A script (`pnpm m1:exit` / `pnpm oxybook-admin m1-exit`) that does the exit sentence against the test repo and records the results in `STATUS.md`. | The exit sentence, measured. | all |
 
 Slices 1, 2, and 3 do not depend on each other and can run in parallel. Slice 4 is the first one that needs the live App, which now exists.
 
