@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is in progress: slices 1–4 (H3 report, spaces via `oxybook-admin`, the job queue, sync) are done, and `crisprintsstuff/oxybook-test` is the M1 test repo. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand. On 2026-10-30 an App created from `/setup/github` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and GitHub's `ping`, `installation`, `push`, and `pull_request` webhooks were verified. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is complete. M1 is in progress: slices 1–4 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync), and the sync half of M1's exit is measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 5, the renderer. There is no renderer, built site, theme, search, accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
@@ -92,5 +92,7 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - Green identity does not mean a construct is editable. JSX, HTML, and unknown directives are raw slices. `:::name Title` is one callout block; nested containers live inside that block, and reformatting a callout is refused so the marker lines stay byte-exact.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
-- The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
+- Compose builds `Dockerfile` for `app` and `worker`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
+- Code pulled into a running `pnpm dev` does not reload: the watchers ignore `packages/*/dist`. Restart after `git pull && pnpm install`.
+- Database tests share one PostgreSQL. Each file uses a throwaway schema, and files run one at a time, because Kysely's migrator scans every schema (`docs/M1-NOTES.md`).
 - M0's exit is met by the pull request in `STATUS.md`. M1 is in progress; do not mark it done until the exit run in `docs/M1-PLAN.md` slice 9 is recorded. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.
