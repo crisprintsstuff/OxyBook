@@ -3,6 +3,8 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { createDb, migrateToLatest } from '@oxybook/db';
+import { type AppCredentials, MemoryAppCredentials } from '@oxybook/github';
+import { deriveSecretsKey, loadAppCredentials, saveAppCredentials } from './app-credentials.js';
 import { createGithubRoutes } from './github-routes.js';
 
 export interface HealthServer {
@@ -56,11 +58,15 @@ export function startAppServer(options: {
   port: number;
   host?: string;
   publicUrl?: string;
+  store?: MemoryAppCredentials;
+  persist?: (credentials: AppCredentials) => Promise<void>;
 }): Promise<HealthServer> {
   const publicUrl =
     options.publicUrl ?? process.env.OXYBOOK_PUBLIC_URL ?? 'http://app.localhost:8080';
   const github = createGithubRoutes({
     owner: { kind: 'user' },
+    ...(options.store ? { store: options.store } : {}),
+    ...(options.persist ? { persist: options.persist } : {}),
     manifest: {
       name: 'OxyBook',
       url: publicUrl,
@@ -134,12 +140,43 @@ export async function migrateOnStart(env: NodeJS.ProcessEnv = process.env): Prom
   }
 }
 
+/**
+ * GitHub App credentials survive a restart only with both DATABASE_URL and
+ * OXYBOOK_SECRET_KEY. Without them the manifest flow still works, in memory.
+ */
+export async function appCredentialsFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  log: (line: string) => void = console.log,
+): Promise<{
+  store: MemoryAppCredentials;
+  persist?: (credentials: AppCredentials) => Promise<void>;
+}> {
+  const store = new MemoryAppCredentials();
+  if (!env.DATABASE_URL || !env.OXYBOOK_SECRET_KEY) {
+    log(
+      'github app credentials: memory only (set DATABASE_URL and OXYBOOK_SECRET_KEY to keep them)',
+    );
+    return { store };
+  }
+  const key = deriveSecretsKey(env.OXYBOOK_SECRET_KEY);
+  const db = createDb(env.DATABASE_URL, { max: 2 });
+  const existing = await loadAppCredentials(db, key);
+  if (existing) {
+    store.set(existing);
+    log(`github app ${existing.id} (${existing.slug}) loaded from the database`);
+  } else {
+    log('github app credentials: none stored yet; open /setup/github to create the App');
+  }
+  return { store, persist: (credentials) => saveAppCredentials(db, key, credentials) };
+}
+
 if (invokedDirectly()) {
   const port = Number(process.env.PORT ?? 3000);
   migrateOnStart()
-    .then((applied) => {
+    .then(async (applied) => {
       for (const name of applied) console.log(`migrated ${name}`);
-      return startAppServer({ port });
+      const credentials = await appCredentialsFromEnv();
+      return startAppServer({ port, ...credentials });
     })
     .then(({ port: bound }) => {
       console.log(`app listening on ${bound}`);

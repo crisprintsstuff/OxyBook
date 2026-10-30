@@ -69,20 +69,94 @@ describe('GitHub manifest routes', () => {
       const state = /state=([0-9a-f]+)/.exec(html)?.[1];
       assert.ok(state);
       const callback = await fetch(`${base}/setup/github/callback?code=abc&state=${state}`);
-      const stored = (await callback.json()) as { stored: boolean; id: number; slug: string };
+      const stored = (await callback.json()) as Record<string, unknown>;
       assert.equal(callback.status, 200);
-      assert.deepEqual(stored, { stored: true, id: 7, slug: 'oxybook' });
+      assert.deepEqual(stored, {
+        stored: true,
+        persisted: false,
+        id: 7,
+        slug: 'oxybook',
+        install_url: 'https://github.com/apps/oxybook/installations/new',
+      });
       assert.equal(JSON.stringify(stored).includes('PRIVATE KEY'), false);
       assert.match(routes.store.get()?.privateKeyPem ?? '', /PRIVATE KEY/);
       const again = await fetch(`${base}/setup/github/callback?code=abc&state=${state}`);
       assert.equal(again.status, 400);
+      const second = await fetch(`${base}/setup/github`);
+      assert.equal(second.status, 409, 'a configured App is never replaced from the setup page');
+      assert.match(await second.text(), /already configured/);
+    });
+  });
+
+  it('persists after the exchange and reports a failed save', async () => {
+    const exchange = async () =>
+      new Response(
+        JSON.stringify({
+          id: 8,
+          slug: 'oxy',
+          client_id: 'cid',
+          client_secret: 'cs',
+          webhook_secret: 'ws',
+          pem: 'pem',
+        }),
+        { status: 201 },
+      );
+    const saved: number[] = [];
+    const ok = createGithubRoutes({
+      manifest: manifestInput,
+      owner: { kind: 'user' },
+      fetch: exchange,
+      persist: async (credentials) => {
+        saved.push(credentials.id);
+      },
+      log: () => {},
+    });
+    await withServer(ok, async (base) => {
+      const state = /state=([0-9a-f]+)/.exec(
+        await (await fetch(`${base}/setup/github`)).text(),
+      )?.[1];
+      const callback = await fetch(`${base}/setup/github/callback?code=c&state=${state}`);
+      assert.equal(callback.status, 200);
+      assert.equal(((await callback.json()) as { persisted: boolean }).persisted, true);
+      assert.deepEqual(saved, [8]);
+    });
+
+    const failing = createGithubRoutes({
+      manifest: manifestInput,
+      owner: { kind: 'user' },
+      fetch: exchange,
+      persist: async () => {
+        throw new Error('db down');
+      },
+      log: () => {},
+    });
+    await withServer(failing, async (base) => {
+      const state = /state=([0-9a-f]+)/.exec(
+        await (await fetch(`${base}/setup/github`)).text(),
+      )?.[1];
+      const callback = await fetch(`${base}/setup/github/callback?code=c&state=${state}`);
+      assert.equal(callback.status, 500);
+      const body = await callback.text();
+      assert.match(body, /created on GitHub but not saved: db down/);
+      assert.doesNotMatch(body, /pem|"ws"/);
+    });
+  });
+
+  it('answers the OAuth callback path with 501 instead of 404', async () => {
+    const routes = createGithubRoutes({ manifest: manifestInput, owner: { kind: 'user' } });
+    await withServer(routes, async (base) => {
+      const response = await fetch(`${base}/api/github/oauth/callback?code=x`);
+      assert.equal(response.status, 501);
+      assert.match(await response.text(), /not implemented/);
     });
   });
 
   it('rejects a webhook whose signature does not match the raw body', async () => {
+    const lines: string[] = [];
     const routes = createGithubRoutes({
       manifest: manifestInput,
       owner: { kind: 'user' },
+      log: (line) => lines.push(line),
     });
     routes.store.set({
       id: 1,
@@ -97,7 +171,11 @@ describe('GitHub manifest routes', () => {
       const good = createHmac('sha256', 'wsecret').update(body).digest('hex');
       const ok = await fetch(`${base}/api/github/webhooks`, {
         method: 'POST',
-        headers: { 'x-hub-signature-256': `sha256=${good}` },
+        headers: {
+          'x-hub-signature-256': `sha256=${good}`,
+          'x-github-event': 'push',
+          'x-github-delivery': 'd-1',
+        },
         body,
       });
       assert.equal(ok.status, 204);
@@ -107,6 +185,10 @@ describe('GitHub manifest routes', () => {
         body: `${body} `,
       });
       assert.equal(bad.status, 401);
+      assert.deepEqual(lines, [
+        'webhook verified event=push delivery=d-1',
+        'webhook rejected event=unknown delivery=unknown reason=signature',
+      ]);
     });
   });
 });
