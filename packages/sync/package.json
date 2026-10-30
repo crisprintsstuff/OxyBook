@@ -1,0 +1,30 @@
+{
+  "name": "@oxybook/sync",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "description": "Read path: blobless mirror, page rules, and sync of a space's ref into PostgreSQL.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "pnpm --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/github build && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/github build && node --import tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@oxybook/db": "workspace:*",
+    "@oxybook/doc-model": "workspace:*",
+    "@oxybook/github": "workspace:*",
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
+  }
+}
