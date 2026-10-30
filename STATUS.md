@@ -6,9 +6,9 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 and M1 complete. All 9 slices of `docs/M1-PLAN.md` and the full M1 exit sentence (`pnpm m1:exit`) are measured on the owner's machine against `crisprintsstuff/oxybook-test`, PostgreSQL, and Caddy. Next is M2 (editor and write path, `docs/MVP.md`).
+- **Milestone:** M0 and M1 complete. M2 in progress: slice 1 of `docs/M2-PLAN.md` (editor document model & dirty-block bridge in `packages/doc-model`) is done and verified across all 595 corpus and fixture files. Next is M2 slice 2 (drafts, `If-Match` optimistic concurrency, diff preview, multi-file git write, and 3-way merge).
 - **Last update:** 2026-10-30.
-- **Round-trip (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
+- **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
 - **Database (`packages/db`):** migrations `0001_schema_v0`, `0002_github_app`, `0003_sync`, and `0004_builds` (forward-only SQL, run by Kysely in one transaction). `pnpm db:migrate`. The app migrates on start with `OXYBOOK_MIGRATE_ON_START=true`. Verified on PostgreSQL 16 and 17, in CI, and from the container image on the owner's machine.
 - **GitHub App:** created from `/setup/github` (manifest flow) and stored encrypted in `github_app` under `OXYBOOK_SECRET_KEY`. `/setup/github` refuses a second App (409). `/api/github/oauth/callback` answers 501 until M2. Webhooks are verified with the stored secret. `ping`, `installation`, `push`, and `pull_request` have all been delivered live. The owner's App is `oxybook-cris`, installed on `oxybook-test`.
@@ -24,7 +24,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 For the next session, human or agent.
 
-- **Resume here:** M2 (editor and write path in `docs/MVP.md`). M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine).
+- **Resume here:** M2 slice 2 (drafts, `If-Match` optimistic concurrency, diff preview, multi-file git write, and 3-way merge in `docs/M2-PLAN.md`). M0, M1, and M2 slice 1 are complete.
 - **Owner's live setup:** App `oxybook-cris` (App id 5535294, installation 176737174 on `crisprintsstuff/oxybook-test`), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.boznetwork.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
 - **After every pull:** `git pull && pnpm install`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own.
 - **Working conventions in this repo:** a branch, then a PR; CI must be green on both the push and the pull_request run before merging. A dated changelog entry goes below for anything measured; write "unverified" when it was not run.
@@ -37,7 +37,7 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | --- | --- |
 | M0 — Foundations and risk spikes | complete |
 | M1 — Read path and published site | complete |
-| M2 — Editor and write path | not started |
+| M2 — Editor and write path | in progress |
 | M3 — Conflicts, versions, renames | not started |
 | M4 — Production readiness, v1.0 | not started |
 
@@ -71,17 +71,33 @@ Still unverified. These are not the exit sentence, and they are not done:
 
 ## M2 next
 
-Not started. Scope from `docs/MVP.md`:
+In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages/doc-model` editor document model and dirty-block bridge) is done. Next is slice 2 (drafts, `If-Match` concurrency, diff preview, multi-file git write, and 3-way merge). Scope from `docs/MVP.md`:
 
-- Editor SPA (`apps/editor`): page tree, TipTap editor for the ARCHITECTURE §3.2 constructs, raw block/inline NodeViews, source mode (CodeMirror 6), metadata panel, image upload, link picker inserting relative paths, in-editor preview through the renderer.
-- Dirty-block tracking via step maps; serializer integration.
-- Drafts with autosave and optimistic concurrency; diff preview; propose / update PR; app-authored vs user-authored PRs; DCO trailer option; path and branch guards in the worker.
-- Editor and Viewer roles; Sign in with GitHub.
-- Clean-merge handling when the base moved; conflicting drafts routed to GitHub/source mode.
+- Editor SPA (`apps/editor`): page tree, TipTap editor for the ARCHITECTURE §3.2 constructs, raw block/inline NodeViews, source mode (CodeMirror 6), metadata panel, image upload, link picker inserting relative paths, in-editor preview through the renderer. *Editor document schema, raw nodes, and metadata panel model are in `packages/doc-model` (slice 1); the browser SPA is slice 4.*
+- Dirty-block tracking via step maps; serializer integration. *Done in `packages/doc-model` (`editor-doc.ts`, slice 1).*
+- Drafts with autosave and optimistic concurrency; diff preview; propose / update PR; app-authored vs user-authored PRs; DCO trailer option; path and branch guards in the worker. *Slices 2 and 3, next.*
+- Editor and Viewer roles; Sign in with GitHub. *Slice 3.*
+- Clean-merge handling when the base moved; conflicting drafts routed to GitHub/source mode. *Slice 2.*
 
 **Done when:** an end-to-end test edits one paragraph in an `.mdx` page containing JSX components, raw HTML and unusual frontmatter, and the resulting PR diff touches only that paragraph's lines; a non-GitHub user can propose a change that a GitHub user then merges, and the site updates.
 
 ## Changelog
+
+### 2026-10-30 — M2 slice 1: editor document model and dirty-block bridge (`packages/doc-model`)
+
+Base was `main` at `5cae0d84f7b78dfd89f361d07ebdb7628f316faa` (CI run `41012269453` green).
+
+- **`packages/doc-model/src/editor-doc.ts` and `packages/doc-model/src/frontmatter.ts`.**
+  - `openEditorDocument`: runs `parse` and the mandatory load-time identity check (`serialize(parse(src)) === src`, ARCHITECTURE §3.4) with SHA-256 `fileHash`. Unparseable or identity-failing files return `{ mode: 'source-only', reason, detail, source, fileHash }`; valid files return `{ mode: 'visual', state, frontmatter, fileHash }`.
+  - `sourceDocToEditorState` and `serializeEditorState`: maps top-level `SourceDoc` blocks to ProseMirror/TipTap block nodes (`paragraph`, `heading` with ATX/setext preservation, `code_block` fenced/indented, `blockquote`, `alert` for GitHub `> [!NOTE]` alerts, `callout` for `:::name Title` containers keeping exact marker lines, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, and atomic `raw_block`) and inline nodes (`text` with `strong`/`em`/`strike`/`code`/`link` marks preserving `referenceType`/`identifier`, `hard_break` preserving `\\` vs two-space breaks, `image`, and atomic `raw_inline`), backed by `sideTable` (`srcId` → `{ source, gapBefore, initialNodeJson, originalBlock }`).
+  - `markBlocksDirtyFromPmSteps`, `markBlocksDirtyByRange`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, and `insertEditorBlock`: tracks dirty blocks from ProseMirror step map ranges or block edits. Unedited blocks (including moved blocks whose `srcId` travels with the node) emit `gapBefore + source` verbatim; dirty blocks re-serialize using the file's `StyleProfile` while emitting nested `raw_block` and `raw_inline` `attrs.source` verbatim.
+  - `inspectFrontmatter` and `updateFrontmatterField` / `updateEditorFrontmatter`: extracts known keys (`title`, `description`, `slug`, `nav_title`, `hidden`) and read-only `unknownKeys` for the metadata panel (ARCHITECTURE §2.4). Updating an existing scalar splices only that scalar's byte range (even when unrelated flow collections like `[1, 2, 3]` exist in the YAML); adding a new known key inserts it before the closing `---` without modifying existing lines or comments.
+- **Plan (`docs/M2-PLAN.md`).** Orders M2 into 5 slices (editor document bridge, drafts + 3-way merge, propose worker + `pull_request` webhooks + Sign in with GitHub + roles, Editor SPA, and `pnpm m2:exit`).
+
+Measured on the owner's machine (Node v22.23.1):
+- `openEditorDocument` + `serializeEditorState` round-tripped all 27 parseable adversarial fixtures and all 567 cached corpus files (594/594) with 100% byte-for-byte identity, and routed `unterminated.mdx` to `source-only` mode.
+- Editing one paragraph in an `.mdx` file containing YAML comments/anchors/unknown keys, `import` statements, `<Tabs>`/`<TabItem>`, `{/* MDX comments */}`, raw HTML `<div className="legacy-banner">`, inline `<Badge variant="tip">v1</Badge>`, `:::tip Custom Callout Title`, and reference links changed only line 28 (within the edited paragraph's original byte range).
+- `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` exited 0 (36 tests in `packages/doc-model`, 112 tests total across the workspace).
 
 ### 2026-10-30 — M1 slice 9: M1 exit run (`pnpm m1:exit`); M1 complete
 

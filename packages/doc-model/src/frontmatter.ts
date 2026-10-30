@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { isScalar, parseDocument } from 'yaml';
+import { isMap, isPair, isScalar, parseDocument } from 'yaml';
 import { changedRegion, regionWithin } from './range.js';
 import type { Frontmatter, LineEnding, SourceDoc } from './types.js';
 
@@ -119,15 +119,52 @@ export function setFrontmatterScalar(
     throw new Error(`frontmatter key ${path.join('.')} is not a scalar`);
   }
   const range = node.range;
+  const originalSlice = lf.slice(range[0], range[1]);
   parsed.setIn(path, value);
   let after = parsed.toString();
   if (!lf.endsWith('\n') && after.endsWith('\n')) after = after.slice(0, -1);
-  const region = changedRegion(lf, after);
+  let region = changedRegion(lf, after);
   if (!region) return doc;
   if (!regionWithin(region, range[0], range[1])) {
-    throw new Error(
-      `refusing to edit ${path.join('.')}: the yaml library would change bytes outside that scalar`,
-    );
+    // `yaml`'s Document.toString() sometimes reformats unrelated flow collections
+    // (e.g. `[1, 2, 3]` -> `[ 1, 2, 3 ]`). Try splicing only the target scalar range
+    // and verify the resulting YAML still parses with the expected scalar value.
+    const anchorMatch = /^(&\S+\s+)/.exec(originalSlice);
+    const anchorPrefix = anchorMatch?.[1] ?? '';
+    const bodySlice = originalSlice.slice(anchorPrefix.length);
+    let formattedScalar: string;
+    if (typeof value === 'boolean' || typeof value === 'number' || value === null) {
+      formattedScalar = String(value);
+    } else if (bodySlice.startsWith("'") && bodySlice.endsWith("'") && !value.includes('\n')) {
+      formattedScalar = `'${value.replace(/'/g, "''")}'`;
+    } else if (bodySlice.startsWith('"') && bodySlice.endsWith('"')) {
+      formattedScalar = JSON.stringify(value);
+    } else if (
+      /^[A-Za-z0-9_./ -]+$/.test(value) &&
+      !/^(true|false|null|~|\d+(\.\d+)?)$/i.test(value.trim()) &&
+      !value.startsWith(' ') &&
+      !value.endsWith(' ')
+    ) {
+      formattedScalar = value;
+    } else {
+      formattedScalar = JSON.stringify(value);
+    }
+    const candidateLf = lf.slice(0, range[0]) + anchorPrefix + formattedScalar + lf.slice(range[1]);
+    const checkDoc = parseDocument(candidateLf, { keepSourceTokens: true });
+    const checkRegion = changedRegion(lf, candidateLf);
+    if (
+      checkDoc.errors.length === 0 &&
+      checkDoc.getIn(path) === value &&
+      checkRegion &&
+      regionWithin(checkRegion, range[0], range[1])
+    ) {
+      after = candidateLf;
+      region = checkRegion;
+    } else {
+      throw new Error(
+        `refusing to edit ${path.join('.')}: the yaml library would change bytes outside that scalar`,
+      );
+    }
   }
 
   let replacement = after.slice(region.start, region.afterEnd);
@@ -156,4 +193,206 @@ export function detectLineEnding(source: string): LineEnding {
     }
   }
   return crlf > lf ? '\r\n' : '\n';
+}
+
+export const KNOWN_FRONTMATTER_KEYS = [
+  'title',
+  'description',
+  'slug',
+  'nav_title',
+  'hidden',
+] as const;
+
+export type KnownFrontmatterKey = (typeof KNOWN_FRONTMATTER_KEYS)[number];
+
+export interface KnownFrontmatterFields {
+  title?: string;
+  description?: string;
+  slug?: string;
+  nav_title?: string;
+  hidden?: boolean;
+}
+
+export interface UnknownFrontmatterEntry {
+  key: string;
+  rawValue: string;
+}
+
+export interface FrontmatterInspection {
+  exists: boolean;
+  parseable: boolean;
+  known: KnownFrontmatterFields;
+  unknownKeys: UnknownFrontmatterEntry[];
+  raw: string | null;
+}
+
+const KNOWN_KEY_SET = new Set<string>(KNOWN_FRONTMATTER_KEYS);
+
+/**
+ * Inspect frontmatter for the editor's metadata panel (ARCHITECTURE §2.4).
+ * Known keys (`title`, `description`, `slug`, `nav_title`, `hidden`) are returned
+ * as typed values; every other top-level key is returned read-only with its raw
+ * source slice. If the YAML fails to parse, `parseable` is false and the panel
+ * disables known-key editing while preserving `raw`.
+ */
+export function inspectFrontmatter(doc: SourceDoc): FrontmatterInspection {
+  const fm = doc.frontmatter;
+  if (!fm) {
+    return {
+      exists: false,
+      parseable: true,
+      known: {},
+      unknownKeys: [],
+      raw: null,
+    };
+  }
+  if (!fm.parseable) {
+    return {
+      exists: true,
+      parseable: false,
+      known: {},
+      unknownKeys: [],
+      raw: fm.raw,
+    };
+  }
+  const lf = toLf(fm.yaml);
+  const parsed = parseDocument(lf, { keepSourceTokens: true });
+  if (parsed.errors.length > 0 || (parsed.contents !== null && !isMap(parsed.contents))) {
+    return {
+      exists: true,
+      parseable: false,
+      known: {},
+      unknownKeys: [],
+      raw: fm.raw,
+    };
+  }
+
+  const known: KnownFrontmatterFields = {};
+  const unknownKeys: UnknownFrontmatterEntry[] = [];
+
+  if (parsed.contents && isMap(parsed.contents)) {
+    for (const item of parsed.contents.items) {
+      if (!isPair(item) || !isScalar(item.key)) continue;
+      const key = String(item.key.value ?? '');
+      if (KNOWN_KEY_SET.has(key) && isScalar(item.value)) {
+        const val = item.value.value;
+        if (key === 'hidden') {
+          if (typeof val === 'boolean') known.hidden = val;
+        } else if (typeof val === 'string') {
+          known[key as Exclude<KnownFrontmatterKey, 'hidden'>] = val;
+        } else if (typeof val === 'number') {
+          known[key as Exclude<KnownFrontmatterKey, 'hidden'>] = String(val);
+        }
+      } else {
+        const valNode = item.value as { range?: [number, number, number] } | null;
+        let rawValue = '';
+        if (valNode?.range) {
+          rawValue = lf.slice(valNode.range[0], valNode.range[1]).trim();
+        } else {
+          rawValue = String(parsed.get(key) ?? '');
+        }
+        unknownKeys.push({ key, rawValue });
+      }
+    }
+  }
+
+  return {
+    exists: true,
+    parseable: true,
+    known,
+    unknownKeys,
+    raw: fm.raw,
+  };
+}
+
+function formatYamlScalarLine(
+  key: KnownFrontmatterKey,
+  value: string | boolean,
+  eol: LineEnding,
+): string {
+  if (typeof value === 'boolean') {
+    return `${key}: ${value ? 'true' : 'false'}${eol}`;
+  }
+  if (
+    /^[A-Za-z0-9_./ -]+$/.test(value) &&
+    !/^(true|false|null|~|\d+(\.\d+)?)$/i.test(value.trim()) &&
+    !value.startsWith(' ') &&
+    !value.endsWith(' ')
+  ) {
+    return `${key}: ${value}${eol}`;
+  }
+  return `${key}: ${JSON.stringify(value)}${eol}`;
+}
+
+/**
+ * Update a known frontmatter key from the metadata panel (ARCHITECTURE §2.4):
+ * - If the key already exists as a scalar in `doc.frontmatter`, delegates to
+ *   `setFrontmatterScalar` so only that scalar's bytes change.
+ * - If `doc.frontmatter` exists and is parseable but does not yet have `key`,
+ *   inserts `<key>: <value>` immediately before the closing `---` delimiter
+ *   without modifying any existing lines.
+ * - If `doc.frontmatter` is null, creates a minimal `---` frontmatter block at
+ *   the top of the document.
+ */
+export function updateFrontmatterField(
+  doc: SourceDoc,
+  key: KnownFrontmatterKey,
+  value: string | boolean,
+): SourceDoc {
+  const fm = doc.frontmatter;
+  if (!fm) {
+    const eol = doc.lineEnding;
+    const yaml = formatYamlScalarLine(key, value, eol);
+    const open = `---${eol}`;
+    const close = `---${eol}`;
+    const raw = `${open}${yaml}${close}`;
+    const firstBlock = doc.blocks[0];
+    const nextBlocks =
+      firstBlock && firstBlock.gapBefore === ''
+        ? [{ ...firstBlock, gapBefore: eol }, ...doc.blocks.slice(1)]
+        : doc.blocks;
+    const base = doc.bom ? 1 : 0;
+    return {
+      ...doc,
+      frontmatter: {
+        raw,
+        yaml,
+        yamlOffset: open.length,
+        parseable: true,
+        start: base,
+        end: base + raw.length,
+      },
+      blocks: nextBlocks,
+    };
+  }
+
+  if (!fm.parseable) {
+    throw new Error('frontmatter did not parse; it is read-only');
+  }
+
+  const lf = toLf(fm.yaml);
+  const parsed = parseDocument(lf, { keepSourceTokens: true });
+  if (parsed.errors.length > 0) {
+    throw new Error('frontmatter did not parse; it is read-only');
+  }
+  const existingNode = parsed.getIn([key], true);
+  if (existingNode !== undefined) {
+    return setFrontmatterScalar(doc, key, value);
+  }
+
+  const eol: LineEnding = fm.raw.includes('\r\n') ? '\r\n' : doc.lineEnding;
+  const line = formatYamlScalarLine(key, value, eol);
+  const needsLeadingNewline = fm.yaml.length > 0 && !fm.yaml.endsWith('\n');
+  const nextYaml = `${fm.yaml}${needsLeadingNewline ? eol : ''}${line}`;
+  const nextRaw =
+    fm.raw.slice(0, fm.yamlOffset) + nextYaml + fm.raw.slice(fm.yamlOffset + fm.yaml.length);
+
+  return {
+    ...doc,
+    frontmatter: {
+      ...fm,
+      yaml: nextYaml,
+      raw: nextRaw,
+    },
+  };
 }

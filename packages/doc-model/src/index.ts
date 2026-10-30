@@ -15,7 +15,43 @@ export {
   summarize,
 } from './compat.js';
 export { insertIntoTextSpan, listPlainTextSpans, reformatBlock } from './edit.js';
-export { type ScalarValue, setFrontmatterScalar } from './frontmatter.js';
+export {
+  type AlertKind,
+  deleteEditorBlock,
+  describeRawNode,
+  type EditorBlockNode,
+  type EditorDocument,
+  type EditorInlineNode,
+  type EditorListItemNode,
+  type EditorMark,
+  type EditorState,
+  type EditorTableCellNode,
+  type EditorTableRowNode,
+  insertEditorBlock,
+  markBlocksDirtyByRange,
+  markBlocksDirtyFromPmSteps,
+  moveEditorBlock,
+  type OpenEditorResult,
+  openEditorDocument,
+  type PmStepMapRange,
+  type SideTableEntry,
+  type StepRange,
+  serializeEditorState,
+  sourceDocToEditorState,
+  updateEditorBlock,
+  updateEditorFrontmatter,
+} from './editor-doc.js';
+export {
+  type FrontmatterInspection,
+  inspectFrontmatter,
+  KNOWN_FRONTMATTER_KEYS,
+  type KnownFrontmatterFields,
+  type KnownFrontmatterKey,
+  type ScalarValue,
+  setFrontmatterScalar,
+  type UnknownFrontmatterEntry,
+  updateFrontmatterField,
+} from './frontmatter.js';
 export { checkIdentity, divergence } from './identity.js';
 export { formatFromFilename, parse, parseOrThrow } from './parse.js';
 export { type ChangeRegion, changedRegion, isLineAligned, regionWithin } from './range.js';

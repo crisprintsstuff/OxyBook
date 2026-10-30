@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 and M1 are complete. All 9 slices of `docs/M1-PLAN.md` (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve, default theme v0, accounts and install in the UI, and the `pnpm m1:exit` exit run) are done and measured on the owner's machine against `crisprintsstuff/oxybook-test`, PostgreSQL, and Caddy. Next is M2 (editor and write path, `docs/MVP.md`). There is no editor yet (`apps/editor` is M2). `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slice 1 (editor document model and dirty-block bridge in `packages/doc-model`) is done; next is slice 2 (drafts, `If-Match` concurrency, diff preview, multi-file git write, and 3-way merge). `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
