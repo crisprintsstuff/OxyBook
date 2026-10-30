@@ -2,7 +2,7 @@
 
 import { createServer, type IncomingMessage, type Server } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { createDb, migrateToLatest } from '@oxybook/db';
+import { createDb, describeDatabaseUrl, migrateToLatest } from '@oxybook/db';
 import { type AppCredentials, MemoryAppCredentials } from '@oxybook/github';
 import { deriveSecretsKey, loadAppCredentials, saveAppCredentials } from './app-credentials.js';
 import { createGithubRoutes } from './github-routes.js';
@@ -135,6 +135,12 @@ export async function migrateOnStart(env: NodeJS.ProcessEnv = process.env): Prom
   try {
     const { applied } = await migrateToLatest(db);
     return applied;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `could not migrate the database at ${describeDatabaseUrl(env.DATABASE_URL)}: ${message}`,
+      { cause: error },
+    );
   } finally {
     await db.destroy();
   }
