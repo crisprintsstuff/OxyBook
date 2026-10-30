@@ -12,7 +12,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 4. `docs/M0-NOTES.md` — what the round-trip library actually guarantees, the measured corpus numbers, and where the design docs are wrong or thin.
 5. `docs/M0-GITHUB-SPIKE.md` — which GitHub and git-write checks were run for real, and which are still fakes.
 6. `STATUS.md` — what is in progress. That file is the status source of truth. Do not duplicate it here.
-7. `docs/LIVE-INSTALL.md` — the owner's checklist for a live GitHub App created from `/setup/github`. That path has not been run against GitHub.
+7. `docs/LIVE-INSTALL.md` — the owner's checklist for a live GitHub App created from `/setup/github`. Run once on 2026-10-30; results are in `STATUS.md`.
 8. `docs/M1-PLAN.md` — M1 scope in order. A plan, not a record.
 
 ## Hard constraints
@@ -26,7 +26,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is not started, and no M1 code is in the tree. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand at `https://github.com/settings/apps/new`. The manifest flow (`/setup/github`) is unverified. Webhook delivery from GitHub is unverified. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is complete. M1 is not started, and no M1 code is in the tree. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand. On 2026-10-30 an App created from `/setup/github` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and GitHub's `ping` and `installation` webhooks were verified. A `push` delivery has not been observed. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
@@ -86,4 +86,4 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - The README still describes `app` and `worker` as a missing image. Compose builds `Dockerfile`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- M0's exit is met by the pull request in `STATUS.md`. Do not mark M1 started. A manifest-created App is still open and is not that exit sentence. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.
+- M0's exit is met by the pull request in `STATUS.md`. Do not mark M1 started. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.

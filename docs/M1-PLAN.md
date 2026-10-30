@@ -22,11 +22,11 @@ Measure before building, then build the read path end to end with no UI, then pu
 | 8 | **Accounts and install in the UI.** Email/password (argon2id), server-side sessions, org and space creation, Admin role, GitHub App install flow and repo connection with the access check from §4.1. | A new user signs up, connects the test repo, and gets the same site as slice 6 without the dev CLI. | 2, 4, 6 |
 | 9 | **M1 exit run.** A script that does the exit sentence against the test repo and records the results in `STATUS.md`. | The exit sentence, measured. | all |
 
-Slices 1, 2, and 3 do not depend on each other and can run in parallel. Slice 4 is the first one that needs the live App.
+Slices 1, 2, and 3 do not depend on each other and can run in parallel. Slice 4 is the first one that needs the live App, which now exists.
 
 ## What the owner needs to do
 
-- **Prove the manifest-created App.** Follow [LIVE-INSTALL.md](LIVE-INSTALL.md): create the App from `/setup/github`, install it on `oxybook-test`, see `webhook verified event=installation` in the server log, and open one pull request with `oxybook-dev propose`. Slice 4 needs an App whose webhook reaches the server. Until this is done, a hand-made App is the fallback.
+- **Manifest-created App: done 2026-10-30.** `oxybook-cris` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and its `ping` and `installation` webhooks reached the server through `oxybook.boznetwork.com`. Slice 4 still needs a `push` delivery, and the server running whenever the test repo changes.
 - **Decide what goes in the test repo.** M1's exit needs a repo with a real docs tree: several pages in folders, a `_dir.yml`, at least one `.mdx` page with components, and later a push that renames one page and deletes another. `crisprintsstuff/oxybook-test` holds two tiny files today. Either grow it, or point M1 at a different repo you own.
 
 ## Open questions this plan does not answer
