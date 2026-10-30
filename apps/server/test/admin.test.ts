@@ -3,7 +3,15 @@
 import assert from 'node:assert/strict';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
-import { createDb, type Database, type Kysely, migrateToLatest, sql } from '@oxybook/db';
+import {
+  createDb,
+  type Database,
+  deriveSecretsKey,
+  type Kysely,
+  migrateToLatest,
+  saveAppCredentials,
+  sql,
+} from '@oxybook/db';
 import {
   createOrg,
   createSpace,
@@ -12,7 +20,6 @@ import {
   normalizeContentRoot,
   parseRepo,
 } from '../src/admin.js';
-import { deriveSecretsKey, saveAppCredentials } from '../src/app-credentials.js';
 
 describe('admin parsing', () => {
   it('normalizes content roots and parses owner/repo', () => {

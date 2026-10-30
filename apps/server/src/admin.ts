@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type { Database, Kysely } from '@oxybook/db';
+import { deriveSecretsKey, loadAppCredentials } from '@oxybook/db';
 import { findRepoInstallation, signAppJwt } from '@oxybook/github';
-import { deriveSecretsKey, loadAppCredentials } from './app-credentials.js';
 
 /**
  * Org and space setup without a UI (M1 slice 2). The UI in slice 8 calls the same

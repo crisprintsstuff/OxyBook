@@ -8,6 +8,14 @@ export {
   describeDatabaseUrl,
 } from './connect.js';
 export {
+  deriveSecretsKey,
+  loadAppCredentials,
+  open,
+  type StoredAppCredentials,
+  saveAppCredentials,
+  seal,
+} from './github-app.js';
+export {
   defaultMigrationsDir,
   type MigrateOutcome,
   migrateToLatest,

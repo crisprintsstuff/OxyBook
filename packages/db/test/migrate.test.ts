@@ -34,7 +34,7 @@ describe('schema v0 migrations', { skip: url ? false : 'DATABASE_URL is not set'
 
   it('applies every migration once, then is a no-op', async () => {
     assert.deepEqual(await migrateToLatest(db, { schema }), {
-      applied: ['0001_schema_v0', '0002_github_app'],
+      applied: ['0001_schema_v0', '0002_github_app', '0003_sync'],
     });
     assert.deepEqual(await migrateToLatest(db, { schema }), { applied: [] });
     const tables = await sql<{ table_name: string }>`
@@ -48,6 +48,7 @@ describe('schema v0 migrations', { skip: url ? false : 'DATABASE_URL is not set'
         'draft_files',
         'drafts',
         'github_app',
+        'inferred_redirects',
         'org_members',
         'orgs',
         'pages',
@@ -56,6 +57,7 @@ describe('schema v0 migrations', { skip: url ? false : 'DATABASE_URL is not set'
         'space_members',
         'spaces',
         'users',
+        'webhook_deliveries',
       ],
     );
   });
