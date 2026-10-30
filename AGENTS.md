@@ -12,7 +12,8 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 4. `docs/M0-NOTES.md` — what the round-trip library actually guarantees, the measured corpus numbers, and where the design docs are wrong or thin.
 5. `docs/M0-GITHUB-SPIKE.md` — which GitHub and git-write checks were run for real, and which are still fakes.
 6. `STATUS.md` — what is in progress. That file is the status source of truth. Do not duplicate it here.
-7. `docs/LIVE-INSTALL.md` — the owner's checklist for a live GitHub App. That install has not been done.
+7. `docs/LIVE-INSTALL.md` — the owner's checklist for a live GitHub App created from `/setup/github`. That path has not been run against GitHub.
+8. `docs/M1-PLAN.md` — M1 scope in order. A plan, not a record.
 
 ## Hard constraints
 
@@ -30,7 +31,7 @@ M0 is complete. M1 is not started, and no M1 code is in the tree. The exit in `d
 ## Repository layout
 
 ```
-apps/server            AGPL   HTTP process. /healthz, GitHub manifest callback, webhook verify.
+apps/server            AGPL   HTTP process. /healthz, migrations on start, GitHub manifest flow (App stored encrypted), webhook verify.
 apps/worker            AGPL   worker process. M0: GET /healthz only.
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLI.
 packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.

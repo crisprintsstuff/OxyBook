@@ -16,7 +16,8 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 - **Live pull request:** [crisprintsstuff/oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) was merged on 2026-10-29 (see the 2026-10-30 entry). It was opened on the public repo [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxybook-test) (default branch `main`). Title `Update docs/test-page.md`. Head branch `oxybook/dev/page-1`. Author is the GitHub App bot `oxybook-dev-cb[bot]`, App id 5530818, installation id 176643684. `GET /repos/crisprintsstuff/oxybook-test/pulls/1/files` returned exactly one entry: `docs/test-page.md`, added, +3/-0. The body contained `Pages changed: docs/test-page.md` and `Link back: https://oxybook.boznetwork.com`. The command was `pnpm oxybook-dev propose <file> --remote https://github.com/crisprintsstuff/oxybook-test.git --github-owner crisprintsstuff --github-repo oxybook-test --installation-id 176643684 --base main --path docs/test-page.md`, with `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY_FILE` set. It exited 0 and printed the commit, the ref, the base, the author, `pr <url>`, and the diff. The App was created by hand at `https://github.com/settings/apps/new`, not through `/setup/github`. The run was Node v22.23.1, not 24. pnpm printed an Unsupported engine warning and the command succeeded. That is a known deviation, not evidence that Node 22 is supported.
 - **Signed-commit note:** The note `docs/MVP.md` asks for exists: `docs/M0-GITHUB-SPIKE.md`. It concludes that `required_signatures` rejects an unsigned `git push` (`GH013`) and accepts a GitHub-signed Git Database API fast-forward (HTTP 200, `verification.verified: true`, `reason: "valid"`). That measurement was on this repo. It was not repeated on `oxybook-test`, and `oxybook-test` has no ruleset.
 - **Database:** `packages/db/migrations/0001_schema_v0.sql` creates `orgs`, `users`, `org_members`, `sessions`, `spaces`, `space_members`, `blobs`, `ref_state`, `pages`, `drafts`, and `draft_files`. Pending files run in one transaction under Kysely's advisory lock; a failing file rolls back every pending file (tested). `apps/server` applies migrations before listening when `OXYBOOK_MIGRATE_ON_START=true`. That was first run from `apps/server/dist/main.js` on the host against the compose `postgres:17` container. On the owner's machine, the rebuilt container image applied `0001_schema_v0` to an empty database and then served. See the 2026-10-30 entries.
-- **What does not:** There is no editor, renderer, or published site. Nothing uses the database beyond migrations. The manifest flow (`/setup/github`) is unverified: the App above was created by hand. Webhook delivery from GitHub to `/api/github/webhooks` is unverified. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. The manifest `callback_urls` entry is `${publicUrl}/api/github/oauth/callback`, and no route serves that path. The callback the server serves is `GET /setup/github/callback`. There is no environment variable for the installation id. The CLI takes `--installation-id`. `pnpm test:integration` and `pnpm test:e2e` are not implemented. See "M0 exit, met".
+- **GitHub App credentials:** With `DATABASE_URL` and `OXYBOOK_SECRET_KEY` set, the manifest callback stores the App in the `github_app` table, encrypted, and the server loads it at start. `/setup/github` returns 409 once an App is stored. `GET /api/github/oauth/callback` answers 501 until Sign in with GitHub (M2). The webhook route logs `webhook verified|rejected event=<e> delivery=<id>`. `oxybook-dev propose` reads `GITHUB_APP_INSTALLATION_ID` when `--installation-id` is absent. All of this was measured locally, not against GitHub. See the 2026-10-30 entry.
+- **What does not:** There is no editor, renderer, or published site. Nothing uses the database beyond migrations. The manifest flow (`/setup/github`) is unverified: the App above was created by hand. Webhook delivery from GitHub to `/api/github/webhooks` is unverified. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` are not implemented. See "M0 exit, met".
 
 ## Milestones
 
@@ -40,18 +41,18 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 
 Still unverified. These are not the exit sentence, and they are not done:
 
-- **Manifest-created App.** Unverified. The App that opened the pull request was created by hand at `https://github.com/settings/apps/new`. `/setup/github` has not been proven end to end.
-- **Webhook delivery** from GitHub to `/api/github/webhooks` in production. Unverified.
+- **Manifest-created App.** Unverified against GitHub. The App that opened the pull request was created by hand. The credentials the manifest flow returns are now stored and reloaded, so the flow can be proven with the steps in `docs/LIVE-INSTALL.md`. That needs the owner.
+- **Webhook delivery** from GitHub to `/api/github/webhooks`. Unverified. The server now logs each delivery, so `webhook verified event=installation` in its log is the evidence to record.
 - **Git Database API fallback** on a repo whose ruleset requires signed commits. Unverified on `oxybook-test`. That repo has no ruleset. The earlier measurement was on this repo. See `docs/M0-GITHUB-SPIKE.md`.
 - **Database schema v0 and migrations** (Kysely + SQL migrations). Done 2026-10-30 in `packages/db`, measured on a local PostgreSQL 16 and the compose `postgres:17` image. CI runs the tests against a `postgres:17` service. The rebuilt image migrates an empty database at start and also starts against an already-migrated one.
-- **OAuth callback path.** The manifest `callback_urls` value is `/api/github/oauth/callback`. No route serves it. The served callback is `GET /setup/github/callback`.
-- **Installation id.** No environment variable. The CLI flag is `--installation-id`.
+- **OAuth callback path.** Closed 2026-10-30: `/api/github/oauth/callback` answers 501 `Sign in with GitHub is not implemented yet`. Sign in with GitHub is M2.
+- **Installation id.** Closed 2026-10-30: `GITHUB_APP_INSTALLATION_ID`, read by the CLI. The flag wins.
 - **`pnpm test:integration` and `pnpm test:e2e`.** Not implemented.
 - **Editor, renderer, and published site.** Not started.
 
 ## M1 next
 
-Not started. No M1 code is in the tree. From `docs/MVP.md`:
+Not started. No M1 code is in the tree. `docs/M1-PLAN.md` puts the scope below in order: the H3 compatibility report first, then spaces, the job queue, sync, renderer, build, theme, accounts, and an exit run. It also lists what the owner has to do: prove the manifest-created App, and choose the M1 test repo. From `docs/MVP.md`:
 
 - Accounts (email/password, sessions), organisations, spaces, Admin role.
 - GitHub App install flow in the UI; repo connection with access check; webhook sync + reconciliation; read model in PostgreSQL.
@@ -63,6 +64,22 @@ Not started. No M1 code is in the tree. From `docs/MVP.md`:
 **Done when:** connecting a test repo yields a published site with working nav and search; a push to the default branch (including a rename and a delete) is reflected on the site with no manual step; a dropped webhook is caught by reconciliation; stopping `app` does not take the published site down.
 
 ## Changelog
+
+### 2026-10-30 — M0 loose ends: App credentials stored, OAuth path, installation id
+
+Before this change the manifest flow could create an App and then lose it. The private key and webhook secret lived in process memory, the callback response leaves them out, and a restart dropped them. The flow could not be proven end to end in that state.
+
+- Migration `0002_github_app.sql` adds the one-row `github_app` table. The client secret, webhook secret, and private key are AES-256-GCM sealed under a key derived from `OXYBOOK_SECRET_KEY` (HKDF-SHA256). The server stores the App after the manifest exchange when `DATABASE_URL` and `OXYBOOK_SECRET_KEY` are set, and loads it at start. Otherwise it says `memory only`. A failed save after a successful exchange returns 500 `created on GitHub but not saved`. `/setup/github` returns 409 when an App is stored. The success body now carries `persisted` and `install_url`.
+- `GET /api/github/oauth/callback` answers 501 instead of 404.
+- The webhook route logs one line per delivery with the event name and `X-GitHub-Delivery`. It still does nothing else with the payload.
+- `oxybook-dev propose` reads `GITHUB_APP_INSTALLATION_ID` when `--installation-id` is absent. Added to `.env.example`.
+- `docs/LIVE-INSTALL.md` follows the new path. `docs/M1-PLAN.md` is new.
+
+Measured, Node v22.22.0, local PostgreSQL 16: `pnpm lint`, `pnpm typecheck`, and `pnpm test` exited 0. `apps/server` 10 pass, `packages/git-write` 8 pass, `packages/db` 3 pass. The new tests cover seal/open with a wrong key, save/load/refuse-second-App in a throwaway schema, persist success and failure, 409, 501, the webhook log lines, and the env fallback.
+
+Smoke run of `apps/server/dist/main.js` on an empty database with `OXYBOOK_MIGRATE_ON_START=true` and a test `OXYBOOK_SECRET_KEY`. Start printed `migrated 0001_schema_v0`, `migrated 0002_github_app`, then `none stored yet`. `/setup/github` returned 200 and the OAuth path returned 501. After a test App row was saved, a restart printed `github app 42 (smoke-app) loaded from the database`. `/setup/github` then returned 409. A webhook signed with the stored secret returned 204 and logged `webhook verified event=ping delivery=smoke-1`. The sealed key column did not contain the plaintext.
+
+Not measured: anything against GitHub. The manifest flow and webhook delivery are still owner steps in `docs/LIVE-INSTALL.md`. The container image was not rebuilt. In compose, `OXYBOOK_SECRET_KEY` defaults to `dev-only-insecure-change-me`, so a compose-run App is stored under that key. Changing the key later makes the server refuse to start until the `github_app` row is removed.
 
 ### 2026-10-30 — Rebuilt image migrates an empty database
 

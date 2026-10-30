@@ -265,6 +265,28 @@ describe('parseProcessArgs', () => {
     assert.equal(withSeparator.file, file);
     assert.equal(withSeparator.remote, remote);
   });
+
+  it('takes the installation id from GITHUB_APP_INSTALLATION_ID when the flag is absent', () => {
+    const argv = [
+      'node',
+      'cli.ts',
+      'propose',
+      'docs/a.md',
+      '--remote',
+      'https://github.com/acme/docs.git',
+      '--github-owner',
+      'acme',
+      '--github-repo',
+      'docs',
+    ];
+    const fromEnv = parseProcessArgs(argv, { GITHUB_APP_INSTALLATION_ID: '176643684' });
+    assert.equal(fromEnv.github?.installationId, 176643684);
+    const flagWins = parseProcessArgs([...argv, '--installation-id', '7'], {
+      GITHUB_APP_INSTALLATION_ID: '176643684',
+    });
+    assert.equal(flagWins.github?.installationId, 7);
+    assert.throws(() => parseProcessArgs(argv, {}), /GITHUB_APP_INSTALLATION_ID/);
+  });
 });
 
 describe('github remote for the push', () => {

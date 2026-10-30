@@ -65,7 +65,10 @@ function optional(argv: string[], flag: string): string | undefined {
   return value;
 }
 
-export function parseProcessArgs(argv: readonly string[]): CliArgs {
+export function parseProcessArgs(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv = process.env,
+): CliArgs {
   const rest = argv.slice(2).filter((arg) => arg !== '--');
   if (rest[0] === 'propose') rest.shift();
   const file = rest.find((arg) => !arg.startsWith('--'));
@@ -80,11 +83,14 @@ export function parseProcessArgs(argv: readonly string[]): CliArgs {
   let github: GithubProposeTarget | undefined;
   if (githubOwner !== undefined) {
     const repo = optional(rest, '--github-repo');
-    const installationRaw = optional(rest, '--installation-id');
+    const installationRaw =
+      optional(rest, '--installation-id') ?? (env.GITHUB_APP_INSTALLATION_ID || undefined);
     const installationId = installationRaw === undefined ? Number.NaN : Number(installationRaw);
     if (!repo) throw new Error('missing --github-repo');
     if (!Number.isInteger(installationId) || installationId <= 0) {
-      throw new Error('--installation-id must be a positive integer');
+      throw new Error(
+        '--installation-id (or GITHUB_APP_INSTALLATION_ID) must be a positive integer',
+      );
     }
     const draftUrl = optional(rest, '--draft-url');
     github = {

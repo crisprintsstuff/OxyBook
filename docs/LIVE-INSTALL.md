@@ -2,9 +2,9 @@
 
 # Live GitHub App install
 
-Checklist for the repo owner. The code has not been through these steps. A unit test is not an install.
+Checklist for the repo owner. The manifest flow (`/setup/github`) has not been through these steps against GitHub. A unit test is not an install. A hand-made App has: see `STATUS.md`.
 
-You supply three things the repo does not know: the tunnel hostname, the GitHub account that will own the App, and the test repository. `.env.example` has no variable for the installation id. Do not invent one. Pass that id on the command line.
+You supply three things the repo does not know: the tunnel hostname, the GitHub account that will own the App, and the test repository. The installation id goes in `GITHUB_APP_INSTALLATION_ID` or `--installation-id` for the CLI. The server does not read it.
 
 ## Port the tunnel must hit
 
@@ -108,7 +108,7 @@ With `OXYBOOK_PUBLIC_URL` set, `apps/server` builds one manifest. These paths ar
 | `callback_urls` | `https://<hostname>/api/github/oauth/callback` |
 | `hook_attributes.url` | `https://<hostname>/api/github/webhooks` |
 
-`GET /setup/github/callback` is the route that exists. It requires query parameters `code` and `state`. `GET /api/github/oauth/callback` is written into the manifest and **no route handles it**. That is a gap. `POST /api/github/webhooks` exists.
+`GET /setup/github/callback` requires query parameters `code` and `state`. `GET /api/github/oauth/callback` answers HTTP 501 `Sign in with GitHub is not implemented yet`. It is in the manifest so the App does not need editing when Sign in with GitHub lands (M2). `POST /api/github/webhooks` verifies the signature and logs one line per delivery.
 
 `SMEE_URL` is in `.env.example`. `apps/server` does not read it. The compose webhook-relay profile does. The manifest's webhook URL is `${OXYBOOK_PUBLIC_URL}/api/github/webhooks`, not `SMEE_URL`. With `cloudflared` pointed at port 3000 you do not need smee. One origin serves both the browser redirect and the webhook.
 
@@ -116,19 +116,31 @@ With `OXYBOOK_PUBLIC_URL` set, `apps/server` builds one manifest. These paths ar
 
 The running server supports the manifest flow only. `startAppServer` sets the owner to `{ kind: 'user' }`, so the form posts to the user settings URL. `manifestCreateUrl` can build `https://github.com/organizations/<org>/settings/apps/new`, and the running server never calls it that way.
 
+0. Start the database and choose a secret key. Keep that key: the App's secrets are encrypted with it, and changing it later makes the server refuse to start until the App row is removed.
+
+   ```sh
+   docker compose up -d postgres
+   export DATABASE_URL=postgres://oxybook:oxybook-dev@127.0.0.1:5432/oxybook
+   export OXYBOOK_SECRET_KEY=$(openssl rand -hex 32)   # save this value
+   export OXYBOOK_MIGRATE_ON_START=true
+   ```
+
+   Without `DATABASE_URL` and `OXYBOOK_SECRET_KEY` the flow still works, but the credentials live in memory and are gone after a restart. The server says which mode it is in at start: `loaded from the database`, `none stored yet`, or `memory only`.
 1. Export `OXYBOOK_PUBLIC_URL=https://<hostname>` and start `pnpm dev`. The server dev script builds `@oxybook/github` first, because `github-routes.ts` imports that package from its `dist` output. Confirm the process prints `app listening on 3000` (or your `PORT`).
 2. In a browser, open `https://<hostname>/setup/github` (or `http://localhost:3000/setup/github` while the tunnel is up; both hit the same route). You must be logged into GitHub in that browser.
 3. The page is one form. The button label is **Create GitHub App**. Submitting it POSTs the manifest to `https://github.com/settings/apps/new?state=<hex>`. The state lasts 15 minutes. The hidden field name is `manifest`.
-4. On GitHub's page, review the permissions (contents write, pull requests write, metadata read; no workflows) and click **Create GitHub App**.
+4. On GitHub's page, review the permissions (contents write, pull requests write, metadata read; no workflows) and click **Create GitHub App**. App names are unique across GitHub. If `OxyBook` is taken, change the name on that page.
 5. GitHub redirects the browser to `https://<hostname>/setup/github/callback?code=<code>&state=<state>`.
 
 A successful callback is HTTP 200 and a JSON body:
 
 ```json
-{"stored":true,"id":123456,"slug":"oxybook"}
+{"stored":true,"persisted":true,"id":123456,"slug":"oxybook","install_url":"https://github.com/apps/oxybook/installations/new"}
 ```
 
-`id` is the App id. `slug` is the App's URL slug. The body has no private key, no client secret, and no webhook secret. Reusing the same `state` returns HTTP 400 and the text `invalid manifest callback`. A failed exchange returns HTTP 502.
+`id` is the App id. `slug` is the App's URL slug. `persisted: true` means the credentials are in the `github_app` table. The body has no private key, no client secret, and no webhook secret. Reusing the same `state` returns HTTP 400 and the text `invalid manifest callback`. A failed exchange returns HTTP 502. If the exchange worked and the save failed, the answer is HTTP 500 `created on GitHub but not saved`. The App then exists on GitHub and its key is only in that process. Delete the App on GitHub and start again.
+
+Once an App is stored, `GET /setup/github` returns HTTP 409 with the stored id, slug, and install link. The setup page never replaces an App.
 
 ## Create the App by hand
 
@@ -144,28 +156,35 @@ After GitHub creates the App, the settings page at `https://github.com/settings/
 
 ## Where the credentials go
 
-The full set (App id, slug, client id, client secret, webhook secret, private key PEM) is stored in memory in that process only. Nothing writes `GITHUB_APP_PRIVATE_KEY_FILE`. Restarting the process drops the memory store.
+With `DATABASE_URL` and `OXYBOOK_SECRET_KEY` set, the full set (App id, slug, client id, client secret, webhook secret, private key PEM) goes into the one-row `github_app` table. The client secret, webhook secret, and key are AES-256-GCM ciphertext under a key derived from `OXYBOOK_SECRET_KEY`. The server loads them at start, and the webhook route uses the stored webhook secret. Without those two variables the set is in memory only and a restart drops it. Nothing writes `GITHUB_APP_PRIVATE_KEY_FILE`.
+
+To start over with a new App, delete the App on GitHub and remove the row: `psql "$DATABASE_URL" -c 'delete from github_app'`.
+
+The rest of this section is for a hand-made App, or for the CLI, which does not read the database.
 
 `.env.example` names these variables. What `apps/server` actually reads:
 
 | Variable | In `.env.example` | Read by `apps/server` |
 | --- | --- | --- |
 | `OXYBOOK_PUBLIC_URL` | yes | yes. Default in code, if unset, is `http://app.localhost:8080`. |
-| `GITHUB_APP_WEBHOOK_SECRET` | yes | yes, and only when the memory store has no webhook secret. |
+| `DATABASE_URL` | no (compose sets it) | yes. Stores and loads the App with `OXYBOOK_SECRET_KEY`. |
+| `OXYBOOK_SECRET_KEY` | yes | yes. Encrypts the stored App secrets. At least 16 characters. |
+| `GITHUB_APP_WEBHOOK_SECRET` | yes | yes, and only when no App is stored. |
+| `GITHUB_APP_INSTALLATION_ID` | yes | no. `oxybook-dev propose` reads it when `--installation-id` is absent. |
 | `GITHUB_APP_ID` | yes | no |
 | `GITHUB_APP_PRIVATE_KEY_FILE` | yes | no |
 | `GITHUB_APP_CLIENT_ID` | yes | no |
 | `GITHUB_APP_CLIENT_SECRET` | yes | no |
 
-That is a gap. Compose passes the four unread `GITHUB_APP_*` variables into the container. The server still ignores them. The callback JSON does not give you the PEM, so you cannot fill `GITHUB_APP_PRIVATE_KEY_FILE` from the redirect.
+Compose passes the four unread `GITHUB_APP_*` variables into the container. The server ignores them. The callback JSON does not give you the PEM, so for the CLI you generate a key on the App's settings page.
 
 `oxybook-dev propose` does read `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY_FILE` when you ask it to open a pull request. Get those from the App settings page, not from the callback body:
 
 1. Open `https://github.com/settings/apps/<slug>`.
 2. Copy **App ID** into `GITHUB_APP_ID`. It is the same number as `id` in the callback JSON.
 3. Under **Private keys**, click **Generate a private key**. GitHub downloads a `.pem`. Set `GITHUB_APP_PRIVATE_KEY_FILE` to that file's path. The server will not load it. The CLI will.
-4. The webhook secret from the manifest exchange was only in process memory, and the HTTP response omitted it. On the same settings page, set **Webhook secret**, and put the same value in `GITHUB_APP_WEBHOOK_SECRET`. After a restart the webhook route uses that variable.
-5. **Client ID** and a generated client secret can be copied into `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET`. Nothing in the server reads them, and nothing serves `/api/github/oauth/callback`.
+4. For a manifest-created App the webhook secret is already stored. Do not change it on GitHub. For a hand-made App, set **Webhook secret** on the settings page and put the same value in `GITHUB_APP_WEBHOOK_SECRET`.
+5. **Client ID** and a generated client secret can be copied into `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET`. Nothing reads them yet.
 
 ## Install the App on one repo
 
@@ -178,11 +197,22 @@ The manifest does not set `setup_url`. After you install, GitHub does not redire
 
 A successful install is GitHub's installation page, not an OxyBook page. For an App on your user account the URL is `https://github.com/settings/installations/<installation_id>`, and that page lists the repository you selected. The number in the path is the installation id.
 
-There is no env var for it. `apps/server` does not read one. Pass `--installation-id <installation_id>` to the CLI.
+Put it in `GITHUB_APP_INSTALLATION_ID`, or pass `--installation-id <installation_id>` to the CLI. The flag wins. `apps/server` does not read either.
+
+## See a webhook arrive
+
+Installing the App makes GitHub send an `installation` event. A push to the test repo sends `push`. The server logs one line per delivery:
+
+```
+webhook verified event=installation delivery=<uuid>
+webhook rejected event=push delivery=<uuid> reason=signature
+```
+
+`verified` with an event name and a delivery id from GitHub is the evidence `STATUS.md` needs. The App's settings page, **Advanced** tab, lists recent deliveries with GitHub's side of the answer (204 or 401). If another App (for example a hand-made one) also sends webhooks to this URL, its deliveries are `rejected ... reason=signature`, because it signs with a different secret. Turn off that App's webhook (**Active**) or uninstall it from the test repo while you test.
 
 ## Open a pull request
 
-This command is implemented and unit-tested against a fake `fetch`. It has not been run against GitHub. Do not treat a green unit test as the M0 exit.
+This command opened [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) with a hand-made App. Running it with the manifest-created App proves that App end to end.
 
 Build the GitHub package once so the CLI can load it (`pnpm oxybook-dev` imports `@oxybook/github` from `dist`):
 
@@ -204,7 +234,7 @@ pnpm oxybook-dev propose path/to/page.md \
   --draft-url https://<hostname>/
 ```
 
-`<owner>`, `<repo>`, the file, and the draft URL are yours. `--draft-url` is optional when `OXYBOOK_PUBLIC_URL` is set; the pull request body uses that URL as the link back. There is no draft page in the server. The link is the URL you pass, not a route this repo serves.
+`--installation-id` can be left out when `GITHUB_APP_INSTALLATION_ID` is exported. `<owner>`, `<repo>`, the file, and the draft URL are yours. `--draft-url` is optional when `OXYBOOK_PUBLIC_URL` is set; the pull request body uses that URL as the link back. There is no draft page in the server. The link is the URL you pass, not a route this repo serves.
 
 The push goes to `refs/heads/oxybook/<user>/<slug>-<id>` with `--force-with-lease`. The base branch is not pushed. The pull request `head` is that `oxybook/*` branch and the `base` is `--base` (default `main`). The body lists the pages changed and the link back. The command prints the pull request URL as `pr https://github.com/<owner>/<repo>/pull/<n>`.
 

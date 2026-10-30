@@ -2,7 +2,7 @@
 
 import type { ColumnType, Generated } from 'kysely';
 
-/** Matches migrations/0001_schema_v0.sql. Keep the two in step. */
+/** Matches migrations/*.sql. Keep the two in step. */
 export interface Database {
   orgs: OrgsTable;
   users: UsersTable;
@@ -15,6 +15,7 @@ export interface Database {
   pages: PagesTable;
   drafts: DraftsTable;
   draft_files: DraftFilesTable;
+  github_app: GithubAppTable;
 }
 
 type CreatedAt = ColumnType<Date, Date | string | undefined, never>;
@@ -137,4 +138,17 @@ export interface DraftFilesTable {
   old_path: string | null;
   base_blob_sha: string | null;
   bytes: Buffer | null;
+}
+
+/** At most one row (0002_github_app.sql). `*_enc` columns are AES-256-GCM sealed. */
+export interface GithubAppTable {
+  singleton: Generated<boolean>;
+  /** bigint arrives from pg as a string. */
+  app_id: ColumnType<string, string | number, string | number>;
+  slug: string;
+  client_id: string;
+  client_secret_enc: Buffer;
+  webhook_secret_enc: Buffer;
+  private_key_enc: Buffer;
+  created_at: CreatedAt;
 }

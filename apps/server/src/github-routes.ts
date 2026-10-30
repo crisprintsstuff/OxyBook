@@ -3,6 +3,7 @@
 import { randomBytes } from 'node:crypto';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
+  type AppCredentials,
   type AppManifestInput,
   buildAppManifest,
   exchangeManifestCode,
@@ -19,6 +20,9 @@ export interface GithubRouteOptions {
   apiBase?: string;
   fetch?: typeof fetch;
   store?: MemoryAppCredentials;
+  /** Durable save after the manifest exchange. Without it, credentials live in memory only. */
+  persist?: (credentials: AppCredentials) => Promise<void>;
+  log?: (line: string) => void;
   now?: () => number;
 }
 
@@ -33,6 +37,7 @@ export function createGithubRoutes(options: GithubRouteOptions): {
   const store = options.store ?? new MemoryAppCredentials();
   const pending = new Map<string, PendingState>();
   const now = options.now ?? Date.now;
+  const log = options.log ?? ((line: string) => console.log(line));
 
   function issueState(): string {
     const state = randomBytes(16).toString('hex');
@@ -52,6 +57,17 @@ export function createGithubRoutes(options: GithubRouteOptions): {
     async handle(request, response, rawBody) {
       const url = new URL(request.url ?? '/', 'http://127.0.0.1');
       if (request.method === 'GET' && url.pathname === '/setup/github') {
+        const existing = store.get();
+        if (existing) {
+          // A second App would orphan the first one's installations and key.
+          sendJson(response, 409, {
+            error: 'a GitHub App is already configured',
+            id: existing.id,
+            slug: existing.slug,
+            install_url: installUrl(existing.slug, options.githubHost),
+          });
+          return true;
+        }
         const state = issueState();
         const manifest = buildAppManifest(options.manifest);
         const action = `${manifestCreateUrl(options.owner, options.githubHost)}?state=${encodeURIComponent(state)}`;
@@ -80,24 +96,59 @@ export function createGithubRoutes(options: GithubRouteOptions): {
           response.end(message);
           return true;
         }
-        const stored = store.get();
-        const body = JSON.stringify({
+        const stored = store.get() as AppCredentials;
+        let persisted = false;
+        if (options.persist) {
+          try {
+            await options.persist(stored);
+            persisted = true;
+          } catch (error) {
+            // The App exists on GitHub and its key is only in this process now.
+            const message = error instanceof Error ? error.message : String(error);
+            log(`github app ${stored.id} created but not saved: ${message}`);
+            sendJson(response, 500, {
+              stored: false,
+              persisted: false,
+              id: stored.id,
+              slug: stored.slug,
+              error: `created on GitHub but not saved: ${message}`,
+            });
+            return true;
+          }
+        }
+        log(
+          `github app ${stored.id} (${stored.slug}) stored${persisted ? ' in the database' : ' in memory only'}`,
+        );
+        sendJson(response, 200, {
           stored: true,
-          id: stored?.id ?? null,
-          slug: stored?.slug ?? null,
+          persisted,
+          id: stored.id,
+          slug: stored.slug,
+          install_url: installUrl(stored.slug, options.githubHost),
         });
-        response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
-        response.end(body);
+        return true;
+      }
+      if (request.method === 'GET' && url.pathname === '/api/github/oauth/callback') {
+        // The manifest registers this path for "Sign in with GitHub" (ARCHITECTURE §7).
+        // That flow is M2. Answer plainly instead of 404 so the gap is visible.
+        response.writeHead(501, { 'content-type': 'text/plain; charset=utf-8' });
+        response.end('Sign in with GitHub is not implemented yet');
         return true;
       }
       if (request.method === 'POST' && url.pathname === '/api/github/webhooks') {
         const secret = store.get()?.webhookSecret ?? process.env.GITHUB_APP_WEBHOOK_SECRET ?? '';
         const header = headerValue(request.headers['x-hub-signature-256']);
+        const event = headerValue(request.headers['x-github-event']) ?? 'unknown';
+        const delivery = headerValue(request.headers['x-github-delivery']) ?? 'unknown';
         if (!secret || !verifyWebhookSignature(rawBody, header, secret)) {
+          log(
+            `webhook rejected event=${event} delivery=${delivery} reason=${secret ? 'signature' : 'no secret'}`,
+          );
           response.writeHead(401, { 'content-type': 'text/plain; charset=utf-8' });
           response.end('invalid signature');
           return true;
         }
+        log(`webhook verified event=${event} delivery=${delivery}`);
         response.writeHead(204);
         response.end();
         return true;
@@ -105,6 +156,15 @@ export function createGithubRoutes(options: GithubRouteOptions): {
       return false;
     },
   };
+}
+
+function sendJson(response: ServerResponse, status: number, body: unknown): void {
+  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  response.end(JSON.stringify(body));
+}
+
+function installUrl(slug: string, githubHost = 'https://github.com'): string {
+  return `${githubHost.replace(/\/$/, '')}/apps/${encodeURIComponent(slug)}/installations/new`;
 }
 
 function headerValue(value: string | string[] | undefined): string | undefined {
