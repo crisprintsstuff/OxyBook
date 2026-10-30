@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export { type Kysely, sql } from 'kysely';
-export { createDb, databaseUrlFromEnv } from './connect.js';
+export {
+  createDb,
+  DEFAULT_CONNECT_TIMEOUT_MS,
+  databaseUrlFromEnv,
+  describeDatabaseUrl,
+} from './connect.js';
 export {
   defaultMigrationsDir,
   type MigrateOutcome,

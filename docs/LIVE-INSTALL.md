@@ -2,7 +2,7 @@
 
 # Live GitHub App install
 
-Checklist for the repo owner. The manifest flow (`/setup/github`) has not been through these steps against GitHub. A unit test is not an install. A hand-made App has: see `STATUS.md`.
+Checklist for the repo owner. These steps were run once on 2026-10-30 and produced App `oxybook-cris` and [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2). The results are in `STATUS.md`.
 
 You supply three things the repo does not know: the tunnel hostname, the GitHub account that will own the App, and the test repository. The installation id goes in `GITHUB_APP_INSTALLATION_ID` or `--installation-id` for the CLI. The server does not read it.
 
@@ -12,7 +12,7 @@ You supply three things the repo does not know: the tunnel hostname, the GitHub 
 
 `docker-compose.yml` also sets `PORT` to `3000` inside the app container and does not publish it on the host. Caddy publishes host port **8080** and proxies to `app:3000`. `OXYBOOK_PUBLIC_URL` in `.env.example` is `http://app.localhost:8080`. That is Caddy, not the port the Node process listens on.
 
-Point `cloudflared` at `http://localhost:3000`. If you exported `PORT` to something else, use that value instead. Do not point the tunnel at 8080 unless you are tunneling Caddy on purpose. Run the app on the host (`pnpm dev`) so port 3000 is open on the machine where `cloudflared` runs.
+Point `cloudflared` at `http://localhost:3000`. If you exported `PORT` to something else, use that value instead. If another program already holds 3000 or 3001 (Grafana defaults to 3000), put `PORT=3100` and `HEALTH_PORT=3101` in `.env` and point the tunnel at 3100. Do not point the tunnel at 8080 unless you are tunneling Caddy on purpose. Run the app on the host (`pnpm dev`) so port 3000 is open on the machine where `cloudflared` runs.
 
 ## Cloudflare Tunnel
 
@@ -125,6 +125,8 @@ The running server supports the manifest flow only. `startAppServer` sets the ow
    export OXYBOOK_MIGRATE_ON_START=true
    ```
 
+   If the server prints nothing after the package builds, check `docker compose ps postgres`. The server waits up to 10s for the database, then exits with `could not migrate the database at ...`.
+
    Without `DATABASE_URL` and `OXYBOOK_SECRET_KEY` the flow still works, but the credentials live in memory and are gone after a restart. The server says which mode it is in at start: `loaded from the database`, `none stored yet`, or `memory only`.
 1. Export `OXYBOOK_PUBLIC_URL=https://<hostname>` and start `pnpm dev`. The server dev script builds `@oxybook/github` first, because `github-routes.ts` imports that package from its `dist` output. Confirm the process prints `app listening on 3000` (or your `PORT`).
 2. In a browser, open `https://<hostname>/setup/github` (or `http://localhost:3000/setup/github` while the tunnel is up; both hit the same route). You must be logged into GitHub in that browser.
@@ -182,7 +184,7 @@ Compose passes the four unread `GITHUB_APP_*` variables into the container. The 
 
 1. Open `https://github.com/settings/apps/<slug>`.
 2. Copy **App ID** into `GITHUB_APP_ID`. It is the same number as `id` in the callback JSON.
-3. Under **Private keys**, click **Generate a private key**. GitHub downloads a `.pem`. Set `GITHUB_APP_PRIVATE_KEY_FILE` to that file's path. The server will not load it. The CLI will.
+3. Under **Private keys**, click **Generate a private key** (**New key** on the Credentials page). GitHub downloads a `.pem`. The key listed there already is the one from the manifest exchange. It lives encrypted in the database and cannot be downloaded again. A second key is fine. Keep the file outside the repo with mode 600. Set `GITHUB_APP_PRIVATE_KEY_FILE` to that file's path. The server will not load it. The CLI will.
 4. For a manifest-created App the webhook secret is already stored. Do not change it on GitHub. For a hand-made App, set **Webhook secret** on the settings page and put the same value in `GITHUB_APP_WEBHOOK_SECRET`.
 5. **Client ID** and a generated client secret can be copied into `GITHUB_APP_CLIENT_ID` and `GITHUB_APP_CLIENT_SECRET`. Nothing reads them yet.
 
@@ -234,7 +236,7 @@ pnpm oxybook-dev propose path/to/page.md \
   --draft-url https://<hostname>/
 ```
 
-`--installation-id` can be left out when `GITHUB_APP_INSTALLATION_ID` is exported. `<owner>`, `<repo>`, the file, and the draft URL are yours. `--draft-url` is optional when `OXYBOOK_PUBLIC_URL` is set; the pull request body uses that URL as the link back. There is no draft page in the server. The link is the URL you pass, not a route this repo serves.
+`--installation-id` can be left out when `GITHUB_APP_INSTALLATION_ID` is exported. It is not the App id. `--draft-url` can be left out when `OXYBOOK_PUBLIC_URL` is exported; a fresh terminal has not loaded `.env`. `<owner>`, `<repo>`, the file, and the draft URL are yours. `--draft-url` is optional when `OXYBOOK_PUBLIC_URL` is set; the pull request body uses that URL as the link back. There is no draft page in the server. The link is the URL you pass, not a route this repo serves.
 
 The push goes to `refs/heads/oxybook/<user>/<slug>-<id>` with `--force-with-lease`. The base branch is not pushed. The pull request `head` is that `oxybook/*` branch and the `base` is `--base` (default `main`). The body lists the pages changed and the link back. The command prints the pull request URL as `pr https://github.com/<owner>/<repo>/pull/<n>`.
 
