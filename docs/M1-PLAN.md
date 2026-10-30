@@ -26,7 +26,7 @@ Slices 1, 2, and 3 do not depend on each other and can run in parallel. Slice 4 
 
 ## What the owner needs to do
 
-- **Manifest-created App: done 2026-10-30.** `oxybook-cris` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and its `ping` and `installation` webhooks reached the server through `oxybook.boznetwork.com`. Slice 4 still needs a `push` delivery, and the server running whenever the test repo changes.
+- **Manifest-created App: done 2026-10-30.** `oxybook-cris` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and its `ping` and `installation` webhooks reached the server through `oxybook.boznetwork.com`. A `push` delivery arrived when oxybook-test#3 merged. Slice 4 needs the server running whenever the test repo changes, or reconciliation to catch up afterwards.
 - **Test repo: decided 2026-10-30.** `crisprintsstuff/oxybook-test` is the M1 test space. [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) seeded its `docs/` tree. Later slices add the rename and delete pushes the exit needs.
 
 ## Open questions this plan does not answer
