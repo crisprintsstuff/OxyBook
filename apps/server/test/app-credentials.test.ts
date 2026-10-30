@@ -3,14 +3,18 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, describe, it } from 'node:test';
-import { createDb, type Database, type Kysely, migrateToLatest, sql } from '@oxybook/db';
 import {
+  createDb,
+  type Database,
   deriveSecretsKey,
+  type Kysely,
   loadAppCredentials,
+  migrateToLatest,
   open,
   saveAppCredentials,
   seal,
-} from '../src/app-credentials.js';
+  sql,
+} from '@oxybook/db';
 import { appCredentialsFromEnv } from '../src/main.js';
 
 const credentials = {

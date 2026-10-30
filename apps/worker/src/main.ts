@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { createServer, type Server } from 'node:http';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { type JobQueue, startJobs } from '@oxybook/jobs';
+import { createDb, type Database, type Kysely } from '@oxybook/db';
+import { type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
+import {
+  findStaleSpaces,
+  runSpaceSync,
+  type SyncEnvironment,
+  storedAppTokens,
+} from '@oxybook/sync';
 
 export interface HealthServer {
   port: number;
@@ -51,15 +59,32 @@ function closeServer(server: Server): Promise<void> {
   });
 }
 
+export interface JobWorkerOptions {
+  log?: (line: string) => void;
+  /** pg-boss schema, for tests. */
+  schema?: string;
+  pollingIntervalSeconds?: number;
+  /** Defaults to a pool on databaseUrl. Tests pass one bound to their schema. */
+  db?: Kysely<Database>;
+  /** Defaults to tokens minted from the stored App with OXYBOOK_SECRET_KEY. */
+  tokenFor?: SyncEnvironment['tokenFor'];
+  githubUrl?: string;
+  mirrorsDir?: string;
+  /** Cron for reconciliation, or 'off'. Default every 5 minutes. */
+  reconcileCron?: string;
+}
+
 /**
  * Registers a handler per queue. Without DATABASE_URL the worker only serves /healthz,
  * which is what compose's health check and the M0 tests need.
  */
 export async function startJobWorker(
   databaseUrl: string,
-  options: { log?: (line: string) => void; schema?: string; pollingIntervalSeconds?: number } = {},
-): Promise<JobQueue> {
+  options: JobWorkerOptions = {},
+): Promise<{ jobs: JobQueue; stop(): Promise<void> }> {
   const log = options.log ?? ((line: string) => console.log(line));
+  const ownDb = options.db ? null : createDb(databaseUrl, { max: 4 });
+  const db = options.db ?? (ownDb as Kysely<Database>);
   const jobs = await startJobs(databaseUrl, {
     log,
     ...(options.schema ? { schema: options.schema } : {}),
@@ -68,6 +93,17 @@ export async function startJobWorker(
     options.pollingIntervalSeconds !== undefined
       ? { pollingIntervalSeconds: options.pollingIntervalSeconds }
       : {};
+  const env: SyncEnvironment = {
+    db,
+    tokenFor: options.tokenFor ?? storedAppTokens(db, process.env.OXYBOOK_SECRET_KEY),
+    githubUrl: options.githubUrl ?? process.env.OXYBOOK_GITHUB_URL ?? 'https://github.com',
+    mirrorsDir:
+      options.mirrorsDir ??
+      process.env.OXYBOOK_MIRRORS_DIR ??
+      path.resolve(process.cwd(), '.oxybook-mirrors'),
+    log,
+  };
+
   await jobs.work(
     'ping',
     async (job) => {
@@ -75,7 +111,52 @@ export async function startJobWorker(
     },
     polling,
   );
-  return jobs;
+  await jobs.work(
+    'sync',
+    async (job) => {
+      const { spaceId, ref, reason } = job.data;
+      log(
+        `job sync ${job.id} space ${spaceId} ref ${ref} (${reason}${job.data.deliveryId ? ` ${job.data.deliveryId}` : ''})`,
+      );
+      try {
+        await runSpaceSync(env, spaceId, ref);
+      } catch (error) {
+        log(`job sync ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+    },
+    polling,
+  );
+  await jobs.work(
+    'reconcile',
+    async () => {
+      for (const outcome of await findStaleSpaces(env)) {
+        if (outcome.error) {
+          log(`reconcile space ${outcome.spaceId}: ${outcome.error}`);
+        } else if (outcome.behind) {
+          const id = await jobs.send(
+            'sync',
+            { spaceId: outcome.spaceId, ref: outcome.ref, reason: 'reconcile' },
+            { singletonKey: syncKey(outcome.spaceId, outcome.ref) },
+          );
+          log(
+            `reconcile space ${outcome.spaceId} ${outcome.ref}: stored ${outcome.stored?.slice(0, 12) ?? 'none'}, remote ${outcome.remote?.slice(0, 12)}; sync ${id ?? 'already queued'}`,
+          );
+        }
+      }
+    },
+    polling,
+  );
+  const cron = options.reconcileCron ?? process.env.OXYBOOK_RECONCILE_CRON ?? '*/5 * * * *';
+  if (cron !== 'off') await jobs.schedule('reconcile', cron, {});
+
+  return {
+    jobs,
+    async stop() {
+      await jobs.stop();
+      await ownDb?.destroy();
+    },
+  };
 }
 
 function invokedDirectly(): boolean {
@@ -93,7 +174,7 @@ if (invokedDirectly()) {
         return;
       }
       await startJobWorker(process.env.DATABASE_URL);
-      console.log('jobs: working on ping');
+      console.log('jobs: working on ping, sync, reconcile');
     })
     .catch((error: unknown) => {
       console.error(error);

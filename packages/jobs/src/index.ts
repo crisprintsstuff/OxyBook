@@ -10,11 +10,40 @@ import { PgBoss } from 'pg-boss';
 export interface JobPayloads {
   /** Round-trip check from `oxybook-admin job ping`. The worker logs it and completes it. */
   ping: { requestedBy: string; at: string };
+  /** Bring a space's ref in line with GitHub (ARCHITECTURE §4.2). The worker reads the head itself. */
+  sync: {
+    spaceId: string;
+    ref: string;
+    reason: 'push' | 'reconcile' | 'manual';
+    deliveryId?: string;
+    /** The head GitHub reported, for the log. Sync fetches and uses the real head. */
+    after?: string;
+  };
+  /** Compare every space's remote head with ref_state and queue syncs for the ones behind. */
+  reconcile: { at?: string };
 }
 
 export type QueueName = keyof JobPayloads;
 
-export const QUEUE_NAMES: readonly QueueName[] = ['ping'];
+export const QUEUE_NAMES: readonly QueueName[] = ['ping', 'sync', 'reconcile'];
+
+/**
+ * `sync` is `stately` with singletonKey `<space>:<ref>`: at most one queued and one active
+ * per space and ref, so a burst of pushes collapses into one follow-up sync.
+ * `reconcile` is `singleton`: one pass at a time across all workers.
+ */
+const QUEUE_OPTIONS: Record<
+  QueueName,
+  { policy?: string; retryLimit?: number; retryDelay?: number; retryBackoff?: boolean }
+> = {
+  ping: {},
+  sync: { policy: 'stately', retryLimit: 3, retryDelay: 30, retryBackoff: true },
+  reconcile: { policy: 'singleton', retryLimit: 0 },
+};
+
+export function syncKey(spaceId: string, ref: string): string {
+  return `${spaceId}:${ref}`;
+}
 
 /** pg-boss keeps its tables in its own schema, next to OxyBook's. */
 export const DEFAULT_JOBS_SCHEMA = 'pgboss';
@@ -27,11 +56,14 @@ export interface ReceivedJob<Q extends QueueName> {
 }
 
 export interface JobQueue {
+  /** The job id, or null when the queue's policy suppressed it (one is already waiting). */
   send<Q extends QueueName>(
     queue: Q,
     data: JobPayloads[Q],
     options?: { singletonKey?: string; retryLimit?: number },
-  ): Promise<string>;
+  ): Promise<string | null>;
+  /** Send `data` to `queue` on a cron schedule. One job per tick across all instances. */
+  schedule<Q extends QueueName>(queue: Q, cron: string, data: JobPayloads[Q]): Promise<void>;
   /** One job at a time per call. A thrown error fails the attempt and pg-boss retries it. */
   work<Q extends QueueName>(
     queue: Q,
@@ -67,12 +99,10 @@ export async function startJobs(
 
   return {
     async send(queue, data, sendOptions = {}) {
-      const id = await boss.send(queue, data, sendOptions);
-      if (!id) {
-        // pg-boss returns null when a singleton or policy rule suppressed the job.
-        throw new Error(`job not queued on ${queue}: suppressed by its singleton key or policy`);
-      }
-      return id;
+      return boss.send(queue, data, sendOptions);
+    },
+    async schedule(queue, cron, data) {
+      await boss.schedule(queue, cron, data);
     },
     async work(queue, handler, workOptions = {}) {
       return boss.work<JobPayloads[typeof queue]>(
@@ -103,7 +133,7 @@ export async function startJobs(
 async function ensureQueue(boss: PgBoss, name: QueueName): Promise<void> {
   if (await boss.getQueue(name)) return;
   try {
-    await boss.createQueue(name);
+    await boss.createQueue(name, QUEUE_OPTIONS[name]);
   } catch (error) {
     // app and worker start together; whoever loses the race finds the queue there.
     if (!(await boss.getQueue(name))) throw error;

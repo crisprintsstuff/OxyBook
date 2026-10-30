@@ -1,8 +1,18 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from 'node:crypto';
-import type { Database, Kysely } from '@oxybook/db';
-import type { AppCredentials } from '@oxybook/github';
+import type { Kysely } from 'kysely';
+import type { Database } from './schema.js';
+
+/** The stored GitHub App. Same shape as @oxybook/github's AppCredentials. */
+export interface StoredAppCredentials {
+  id: number;
+  slug: string;
+  clientId: string;
+  clientSecret: string;
+  webhookSecret: string;
+  privateKeyPem: string;
+}
 
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
@@ -42,7 +52,7 @@ export function open(sealed: Buffer, key: Buffer): string {
 export async function loadAppCredentials(
   db: Kysely<Database>,
   key: Buffer,
-): Promise<AppCredentials | null> {
+): Promise<StoredAppCredentials | null> {
   const row = await db.selectFrom('github_app').selectAll().executeTakeFirst();
   if (!row) return null;
   return {
@@ -59,7 +69,7 @@ export async function loadAppCredentials(
 export async function saveAppCredentials(
   db: Kysely<Database>,
   key: Buffer,
-  credentials: AppCredentials,
+  credentials: StoredAppCredentials,
 ): Promise<void> {
   await db
     .insertInto('github_app')

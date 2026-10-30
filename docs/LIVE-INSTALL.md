@@ -6,6 +6,18 @@ Checklist for the repo owner. These steps were run once on 2026-10-30 and produc
 
 You supply three things the repo does not know: the tunnel hostname, the GitHub account that will own the App, and the test repository. The installation id goes in `GITHUB_APP_INSTALLATION_ID` or `--installation-id` for the CLI. The server does not read it.
 
+## After every pull
+
+`pnpm install` installs into the project folder, so run it once, in any terminal. Then restart `pnpm dev`. Migrations and new worker code load only at start.
+
+```sh
+git pull && pnpm install
+# then Ctrl+C in the pnpm dev terminal, and:
+pnpm dev
+```
+
+A new terminal does not have the variables from `.env`. Load them again with `set -a; . ./.env; set +a` and export `DATABASE_URL`. `echo $DATABASE_URL $PORT` shows whether they are set.
+
 ## Port the tunnel must hit
 
 `.env.example` does not set `PORT`. `apps/server/src/main.ts` listens on `process.env.PORT`, and the default is **3000**. `pnpm dev` starts that process on the host.

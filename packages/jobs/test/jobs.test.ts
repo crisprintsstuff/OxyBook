@@ -52,7 +52,9 @@ describe('job queue', { skip: url ? false : 'DATABASE_URL is not set' }, () => {
 
     const ids: string[] = [];
     for (let i = 0; i < 20; i++) {
-      ids.push(await app.send('ping', { requestedBy: 'test', at: new Date().toISOString() }));
+      const id = await app.send('ping', { requestedBy: 'test', at: new Date().toISOString() });
+      assert.ok(id);
+      ids.push(id);
     }
     await until(() => seen.length >= ids.length);
     await new Promise((resolve) => setTimeout(resolve, 1_500));
@@ -83,6 +85,7 @@ describe('job queue', { skip: url ? false : 'DATABASE_URL is not set' }, () => {
       { requestedBy: 'flaky', at: new Date().toISOString() },
       { retryLimit: 1 },
     );
+    assert.ok(id);
     await until(async () => (await queue.state('ping', id)) === 'completed', 30_000);
     assert.equal(attempts, 2);
   });

@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 complete. M1 in progress: slices 1–3 of `docs/M1-PLAN.md` are done (the H3 compatibility report, spaces without UI, and the job queue). The exit is not met.
+- **Milestone:** M0 complete. M1 in progress: slices 1–4 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces without UI, job queue, sync). The exit is not met.
 - **Last update:** 2026-10-30.
 - **What works today:** `packages/doc-model` parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` (and `:::name`, `::: name Title`, `:::name[Title]`) is one callout block, not a run of paragraphs. On 2026-10-29, after that fold, `pnpm test:corpus` reported 594 pass, 0 fail, 1 unparseable (the planted unterminated `.mdx` fixture). App and worker processes answer `GET /healthz` in unit tests. A scratch-repo spike recorded `git merge-file` / `git merge-tree --write-tree` outcomes for concurrent edits. `packages/db` holds schema v0 as plain SQL migrations with Kysely types; `pnpm db:migrate` applied `0001_schema_v0` on PostgreSQL 16 and a second run reported up to date; the app's migrate-on-start did the same on PostgreSQL 17.11. No application code reads or writes those tables yet.
 - **Dev server:** `pnpm dev` prints `app listening on 3000` and `worker listening on 3001`. `GET /healthz` on those ports returned 200 `{"ok":true,"service":"app"}` and 200 `{"ok":true,"service":"worker"}`. The processes were then stopped. The app script builds `@oxybook/github` and `@oxybook/db` (since 2026-10-30) and runs `tsx watch`.
@@ -18,6 +18,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 - **M1 test repo:** [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxybook-test) is the M1 test space and the repo for later live tests (owner's decision, 2026-10-30). [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) seeded `docs/` with 11 pages, `_dir.yml` files, `oxybook.yml`, an image asset, `_partials/`, and an MDX page with imports, components, an expression, and one intentionally broken link. All 11 pass `oxybook-roundtrip`.
 - **Compatibility report:** `pnpm oxybook-check <dir>` reports, with `file:line` warnings, what would render as a placeholder. `pnpm compat:corpus` runs it over the pinned corpus. Results and the recommended component list are in `docs/M1-NOTES.md`. With the starting allowlist, 286 of 567 corpus files (50.4%) have no placeholder, and adding Starlight's built-ins raises that to 352 (62.1%).
 - **Spaces and jobs:** `pnpm oxybook-admin` creates orgs and spaces (`org create`, `space create <org>/<space> --repo owner/repo`, `space list`). Without `--installation-id`, it asks GitHub as the stored App which installation covers the repo. `packages/jobs` wraps pg-boss (schema `pgboss`). The worker works jobs when `DATABASE_URL` is set. `pnpm oxybook-admin job ping` sends a job and waits for a worker to complete it. The only queue is `ping`; sync is slice 4. On the owner's machine, `space create cris/test` found installation 176737174 as `oxybook-cris`, and `job ping` completed through the running worker. See the 2026-10-30 entries.
+- **Sync:** `packages/sync` keeps a blobless mirror per repo and brings `blobs`, `pages`, and `ref_state` in line with a space's default branch in one transaction. It records renames in `inferred_redirects`. Triggers: a verified `push` webhook (deduplicated in `webhook_deliveries`) queues a `sync` job, a `reconcile` job every 5 minutes compares `git ls-remote` heads with `ref_state`, and `oxybook-admin sync <org>/<space> [--now]` runs one by hand. `oxybook-admin pages <org>/<space>` lists what is stored. A sync of the real `oxybook-test` from this session stored 11 pages, matching GitHub's tree at `9f6835d`. Not yet run on the owner's machine. See the 2026-10-30 entry.
 - **Database:** `packages/db/migrations/0001_schema_v0.sql` creates `orgs`, `users`, `org_members`, `sessions`, `spaces`, `space_members`, `blobs`, `ref_state`, `pages`, `drafts`, and `draft_files`. Pending files run in one transaction under Kysely's advisory lock; a failing file rolls back every pending file (tested). `apps/server` applies migrations before listening when `OXYBOOK_MIGRATE_ON_START=true`. That was first run from `apps/server/dist/main.js` on the host against the compose `postgres:17` container. On the owner's machine, the rebuilt container image applied `0001_schema_v0` to an empty database and then served. See the 2026-10-30 entries.
 - **GitHub App credentials:** With `DATABASE_URL` and `OXYBOOK_SECRET_KEY` set, the manifest callback stores the App in the `github_app` table, encrypted, and the server loads it at start. `/setup/github` returns 409 once an App is stored. `GET /api/github/oauth/callback` answers 501 until Sign in with GitHub (M2). The webhook route logs `webhook verified|rejected event=<e> delivery=<id>`. `oxybook-dev propose` reads `GITHUB_APP_INSTALLATION_ID` when `--installation-id` is absent. On 2026-10-30 the owner created App `oxybook-cris` (App id 5535294) from `/setup/github`. It was stored in the database, and GitHub's `ping` and `installation` webhooks were logged as verified. See the 2026-10-30 entries.
 - **What does not:** There is no editor, renderer, or published site. Nothing uses the database beyond migrations. Webhook payloads are verified and logged, and nothing acts on them yet. The Git Database API fallback against a ruleset that requires signed commits is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` are not implemented. See "M0 exit, met".
@@ -55,7 +56,7 @@ Still unverified. These are not the exit sentence, and they are not done:
 
 ## M1 next
 
-In progress. `docs/M1-PLAN.md` puts the scope below in order. Slice 1 (H3 compatibility report, `docs/M1-NOTES.md`), slice 2 (spaces without UI), and slice 3 (job queue) are done. Next is slice 4: sync `oxybook-test` into `blobs`, `pages`, and `ref_state` on the `push` webhook and by reconciliation. The manifest-created App and the test repo are in place. From `docs/MVP.md`:
+In progress. `docs/M1-PLAN.md` puts the scope below in order. Slices 1–4 are done: the H3 compatibility report (`docs/M1-NOTES.md`), spaces without UI, the job queue, and sync. Slice 4's exit check (a push with an edit, a rename, and a delete reflected on the owner's machine, plus a dropped webhook caught by reconciliation) is measured locally. On the owner's machine it is not yet measured. Next is slice 5, renderer v0. The manifest-created App and the test repo are in place. From `docs/MVP.md`:
 
 - Accounts (email/password, sessions), organisations, spaces, Admin role.
 - GitHub App install flow in the UI; repo connection with access check; webhook sync + reconciliation; read model in PostgreSQL.
@@ -67,6 +68,39 @@ In progress. `docs/M1-PLAN.md` puts the scope below in order. Slice 1 (H3 compat
 **Done when:** connecting a test repo yields a published site with working nav and search; a push to the default branch (including a rename and a delete) is reflected on the site with no manual step; a dropped webhook is caught by reconciliation; stopping `app` does not take the published site down.
 
 ## Changelog
+
+### 2026-10-30 — M1 slice 4: sync
+
+- **Migration `0003_sync`.** `webhook_deliveries` (delivery id, event, received at) and `inferred_redirects` (space, ref, from URL to URL, paths, commit).
+- **`packages/sync`.**
+  - `fetchRef` keeps one blobless bare mirror per repo and force-updates `refs/heads/<ref>`.
+  - `listFiles` reads trees only. `readBlobs` fetches missing blobs on demand. `findRenames` runs `git diff -M`. `remoteHead` runs `git ls-remote`.
+  - The installation token goes to git as an `http.extraHeader` through `GIT_CONFIG_*` environment variables. It is never in argv, the mirror config, or a URL.
+  - Page rules from ARCHITECTURE §2.2–2.5: `.md`/`.mdx`, no `_`/`.` segments, extension removed, `index` collapsed, `README.md` as the directory page only without an `index.*`, case kept, `slug` relative or absolute. Title comes from frontmatter, then the first H1, then the filename; `nav_title` and `hidden` are read too.
+  - `syncSpace` compares the whole tree at the new head with the stored rows, instead of applying only `git diff from..to`. That corrects itself after a lost webhook, a deleted mirror, or a force-push. The correction is recorded in `docs/M1-NOTES.md`. Bytes come from `blobs` when cached. Rows are deleted before insert, because two pages can swap URLs. A page whose URL is taken is skipped with a log line. Each page gets a `tsv` (title weighted A).
+- **Jobs.** New queues `sync` (`stately`, singletonKey `<space>:<ref>`, 3 retries with backoff) and `reconcile` (`singleton`, scheduled every 5 minutes; `OXYBOOK_RECONCILE_CRON`, `off` disables it). `send` now returns null when the policy suppressed a job.
+- **Worker.** It handles `sync` (`runSpaceSync`: loads the space, mints an installation token from the stored App, mirrors under `OXYBOOK_MIRRORS_DIR` or `./.oxybook-mirrors`) and `reconcile` (`findStaleSpaces`, then queues a sync for each space that is behind).
+- **App.** A verified webhook is recorded in `webhook_deliveries`. A repeat is ignored. A `push` to a space's default branch (repo matched case-insensitively) queues a sync. A handler error answers 500, so GitHub can redeliver.
+- **CLI.** `oxybook-admin sync <org>/<space> [--now]` and `oxybook-admin pages <org>/<space>`.
+- **Moved.** The stored-App code (`seal`/`open`, `loadAppCredentials`, `saveAppCredentials`) moved from `apps/server` to `packages/db` so the worker can read it.
+- **Scripts.** Root `dev` runs `build:libs` once and then the two watchers, so they no longer build the same packages at once. Root `test` and `typecheck` run packages one at a time for the same reason.
+
+Measured, Node v22.22.0, local PostgreSQL 16. `pnpm lint`, `pnpm typecheck`, and `pnpm test` exited 0, with 84 tests passing. New tests:
+- `packages/sync`, against a local bare remote with partial clone enabled:
+  - the first sync stores exactly the page files;
+  - an edit, a rename, a delete, and an add are applied, `pages` equals the page files in `git ls-tree` at each head, and the redirect `/guides/install` → `/guides/setup` is recorded;
+  - a repeat sync and a sync after deleting the mirror are no-ops;
+  - a force-push is followed;
+  - a URL clash is skipped.
+- Page rules and frontmatter fallbacks.
+- `apps/server`: push to the default branch queues one sync per delivery and the redelivery is ignored; other branches, tags, deletions, unknown repos, and other events are ignored.
+- `apps/worker`: a `sync` job syncs the branch, and after a push with no webhook, a `reconcile` job queued a sync that stored the new page and moved `ref_state` to the remote head.
+
+Live, from this session, without a token (the repo is public): `syncSpace` on `https://github.com/crisprintsstuff/oxybook-test.git` stored 11 pages at `9f6835d1283b8ac01c0603767198e9632754c4fd`. That matched `GET /repos/crisprintsstuff/oxybook-test/git/trees/main?recursive=1` filtered to page files under `docs/`. `/reference/env` (slug), `nav_title` "Start here", `hidden` on `internal-notes`, and `/guides` from `index.mdx` all came out as the rules say.
+
+Not measured: the installation token path (worker on the owner's machine with the stored App), a webhook-triggered sync end to end, and the container image.
+
+CI on the first push of this change: one `check` run passed and one failed on the same commit (`a5203b7`/`73e066a`, run 40990492750). Cause: test files in `apps/server` ran in parallel, and Kysely's migrator scans every schema while another file dropped its throwaway schema (`schema "oxybook_test_…" does not exist`). Reproduced locally: 21 of 40 migrations failed under concurrent schema drops. Database test files now run one at a time (`--test-concurrency=1`). Details are in `docs/M1-NOTES.md`.
 
 ### 2026-10-30 — Space `cris/test` created; the queue round-trips on the owner's machine
 

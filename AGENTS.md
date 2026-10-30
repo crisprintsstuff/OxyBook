@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is in progress: slices 1–3 (H3 report, spaces via `oxybook-admin`, the job queue) are done, and `crisprintsstuff/oxybook-test` is the M1 test repo. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand. On 2026-10-30 an App created from `/setup/github` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and GitHub's `ping`, `installation`, `push`, and `pull_request` webhooks were verified. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
+M0 is complete. M1 is in progress: slices 1–4 (H3 report, spaces via `oxybook-admin`, the job queue, sync) are done, and `crisprintsstuff/oxybook-test` is the M1 test repo. The exit in `docs/MVP.md` is met: corpus identity runs in CI, `docs/M0-GITHUB-SPIKE.md` records the signed-commit behaviour, and [oxybook-test#1](https://github.com/crisprintsstuff/oxybook-test/pull/1) is a real pull request whose diff is only `docs/test-page.md`. That App was created by hand. On 2026-10-30 an App created from `/setup/github` opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2), and GitHub's `ping`, `installation`, `push`, and `pull_request` webhooks were verified. Database schema v0 and `pnpm db:migrate` exist (`packages/db`); nothing reads or writes those tables yet. The editor, the renderer, and a published site do not exist. Read `STATUS.md` before assuming a milestone is done, and update that file when you change what is true.
 
 ## Repository layout
 
@@ -39,6 +39,7 @@ packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, 
 packages/git-write      AGPL   blobless mirror, commit from a temporary index, push to oxybook/*.
 packages/db             AGPL   schema v0 as plain SQL migrations, Kysely types and connection, migrator.
 packages/jobs           AGPL   job queue on PostgreSQL (pg-boss): queue names, payload types, send/work.
+packages/sync           AGPL   read path: blobless mirror, page rules (URLs, titles), sync into blobs/pages/ref_state.
 corpus/manifest.json          pinned doc repos (SHA + sparse path).
 corpus/fixtures               adversarial markdown, committed.
 corpus/cache                  fetched repos. Gitignored. Do not commit.
@@ -65,6 +66,7 @@ pnpm typecheck
 pnpm build
 pnpm oxybook-roundtrip <file-or-directory>
 pnpm oxybook-admin space list   # org/space setup without UI; `job ping` round-trips the queue
+pnpm oxybook-admin sync <org>/<space> [--now]   # queue (or run here) a sync; `pages <org>/<space>` lists the result
 pnpm oxybook-check <dir>      # what would render as a placeholder, file:line
 pnpm compat:corpus           # the H3 report over corpus/cache; run test:corpus first
 pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git

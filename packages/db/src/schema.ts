@@ -16,6 +16,8 @@ export interface Database {
   drafts: DraftsTable;
   draft_files: DraftFilesTable;
   github_app: GithubAppTable;
+  webhook_deliveries: WebhookDeliveriesTable;
+  inferred_redirects: InferredRedirectsTable;
 }
 
 type CreatedAt = ColumnType<Date, Date | string | undefined, never>;
@@ -150,5 +152,23 @@ export interface GithubAppTable {
   client_secret_enc: Buffer;
   webhook_secret_enc: Buffer;
   private_key_enc: Buffer;
+  created_at: CreatedAt;
+}
+
+export interface WebhookDeliveriesTable {
+  delivery_id: string;
+  event: string;
+  received_at: CreatedAt;
+}
+
+export interface InferredRedirectsTable {
+  org_id: string;
+  space_id: string;
+  ref: string;
+  from_url: string;
+  to_url: string;
+  from_path: string;
+  to_path: string;
+  commit_sha: string;
   created_at: CreatedAt;
 }

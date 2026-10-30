@@ -12,8 +12,10 @@ const url = process.env.DATABASE_URL;
 describe('worker jobs', { skip: url ? false : 'DATABASE_URL is not set' }, () => {
   const schema = `pgboss_test_${randomBytes(6).toString('hex')}`;
   const queues: JobQueue[] = [];
+  const stops: (() => Promise<void>)[] = [];
 
   after(async () => {
+    for (const stop of stops) await stop();
     for (const queue of queues) await queue.stop();
     const client = new pg.Client({ connectionString: url });
     await client.connect();
@@ -27,10 +29,13 @@ describe('worker jobs', { skip: url ? false : 'DATABASE_URL is not set' }, () =>
       schema,
       log: (line) => lines.push(line),
       pollingIntervalSeconds: 0.5,
+      reconcileCron: 'off',
     });
     const app = await startJobs(url as string, { schema, log: () => {} });
-    queues.push(worker, app);
+    stops.push(worker.stop);
+    queues.push(app);
     const id = await app.send('ping', { requestedBy: 'test', at: new Date().toISOString() });
+    assert.ok(id);
     const deadline = Date.now() + 15_000;
     while ((await app.state('ping', id)) !== 'completed') {
       if (Date.now() > deadline) throw new Error('ping never completed');
