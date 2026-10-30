@@ -27,12 +27,12 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 is complete. M1 is in progress: slices 1–7 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve, default theme v0), and both the sync half and the Caddy build-and-serve check of M1's exit are measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 8, accounts and install in the UI. There are no accounts, editor, or UI beyond `/setup/github`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 is complete. M1 is in progress: slices 1–8 of `docs/M1-PLAN.md` are done (H3 compatibility report, spaces via `oxybook-admin`, the job queue, sync, renderer v0, build and serve, default theme v0, accounts and install in the UI), and the sync half, the Caddy build-and-serve check, and the UI signup/repo-connect/sync/build flow of M1's exit are all measured on the owner's machine against `crisprintsstuff/oxybook-test`. Next is slice 9, the M1 exit run. There is no editor yet (`apps/editor` is M2). `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
 ```
-apps/server            AGPL   HTTP process. /healthz, migrations on start, GitHub manifest flow (App stored encrypted), webhook verify.
+apps/server            AGPL   HTTP process. /healthz, migrations on start, accounts/sessions, org/space UI, GitHub manifest flow, webhook verify.
 apps/worker            AGPL   worker process. /healthz; works jobs from the queue when DATABASE_URL is set.
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLIs (oxybook-roundtrip, oxybook-check).
 packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.

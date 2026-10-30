@@ -14,6 +14,7 @@
     "start": "node dist/main.js"
   },
   "dependencies": {
+    "@node-rs/argon2": "2.2.2",
     "@oxybook/db": "workspace:*",
     "@oxybook/github": "workspace:*",
     "@oxybook/jobs": "workspace:*",

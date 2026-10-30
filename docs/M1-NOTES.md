@@ -146,3 +146,13 @@ Date: 2026-10-30. Node v22.23.1. Details and measurements are in `STATUS.md`.
   - `<Tabs>` / `<TabItem>` (`.oxybook-tabs`) with keyboard arrow navigation and `data-tabs-group` + `localStorage` synchronization across the page;
   - `::: code-group` / `<CodeGroup>` (`.oxybook-code-group`) by generating a `<div class="oxybook-tabs-list" role="tablist">` from the child `<pre>` blocks' `data-title` or `data-language`;
   - Pagefind search UI (`#oxybook-search`, `/` and `Ctrl+K` / `Cmd+K` focus shortcut), mobile sidebar drawer toggle (`.oxybook-mobile-toggle` + `Escape`), and header version switcher (`[data-version-switcher]`).
+
+## Accounts and install in the UI (slice 8)
+
+Date: 2026-10-30. Node v22.23.1. Details and measurements are in `STATUS.md`.
+
+### Where ARCHITECTURE.md is thin
+
+- **§4.1 repository access check before M2 ("Sign in with GitHub").** ARCHITECTURE §4.1 says connecting a repository to a space checks with the admin's GitHub user token that they have admin or write access to that repo, while M1-PLAN.md defers "Sign in with GitHub" (`/api/github/oauth/callback`) to M2. `verifyRepoConnection` (`apps/server/src/admin.ts`) and `checkUserRepoAccess` (`packages/github`) implement both: when a user token (`user_token` / `userToken`) is supplied (or `requireUserToken: true` is set), `GET /repos/{owner}/{repo}` is called with that user token and requires `permissions.admin || permissions.maintain || permissions.push` (rejecting read-only tokens with HTTP 403); in all cases, it verifies via `GET /repos/{owner}/{repo}/installation` (App JWT) and `GET /repos/{owner}/{repo}` (installation token) that the stored GitHub App is installed on `owner/repo` and can access it. The dashboard also queries `GET /app/installations` and `GET /installation/repositories` as the stored App so an org owner can pick an installed repository in one click.
+- **§7 `space_members` composite foreign key.** `0001_schema_v0.sql` declares `FOREIGN KEY (org_id, user_id) REFERENCES org_members (org_id, user_id) ON DELETE CASCADE` on `space_members`. `setSpaceMemberRole` (`apps/server/src/admin.ts`) ensures the target user has an `org_members` row (`role = 'member'` if not already present) in the same transaction before upserting `space_members`.
+- **Pre-existing CLI orgs and first user signup.** When the first user signs up on an instance (`count(users) = 0` before insert) where `orgs`/`spaces` were created earlier via `oxybook-admin`, `signUpUser` attaches that first user as `owner` of memberless `orgs` and `admin` of their `spaces` in the same transaction.

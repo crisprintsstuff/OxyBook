@@ -1,19 +1,27 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import { createServer, type IncomingMessage, type Server } from 'node:http';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   createDb,
+  type Database,
   deriveSecretsKey,
   describeDatabaseUrl,
+  type Kysely,
   loadAppCredentials,
   migrateToLatest,
   saveAppCredentials,
 } from '@oxybook/db';
 import { type AppCredentials, MemoryAppCredentials } from '@oxybook/github';
-import { startJobs } from '@oxybook/jobs';
+import { startJobs, syncKey } from '@oxybook/jobs';
+import { runSpaceBuild } from '@oxybook/renderer';
+import { runSpaceSync, storedAppTokens } from '@oxybook/sync';
 import { type Delivery, handleDelivery, pruneDeliveries } from './deliveries.js';
 import { createGithubRoutes } from './github-routes.js';
+import { createUiRoutes, type UiRouteOptions } from './ui-routes.js';
+
+const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
 export interface HealthServer {
   port: number;
@@ -69,6 +77,7 @@ export function startAppServer(options: {
   store?: MemoryAppCredentials;
   persist?: (credentials: AppCredentials) => Promise<void>;
   onDelivery?: (delivery: Delivery) => Promise<void>;
+  ui?: Omit<UiRouteOptions, 'publicUrl' | 'store'>;
 }): Promise<HealthServer> {
   const publicUrl =
     options.publicUrl ?? process.env.OXYBOOK_PUBLIC_URL ?? 'http://app.localhost:8080';
@@ -86,9 +95,17 @@ export function startAppServer(options: {
       description: 'Docs whose git repository is the source of truth',
     },
   });
+  const ui = options.ui
+    ? createUiRoutes({
+        ...options.ui,
+        publicUrl,
+        store: github.store,
+      })
+    : null;
   const server = createServer(async (request, response) => {
     const rawBody = await readRawBody(request);
     if (await github.handle(request, response, rawBody)) return;
+    if (ui && (await ui.handle(request, response, rawBody))) return;
     const url = request.url?.split('?')[0];
     if (request.method === 'GET' && url === '/healthz') {
       const body = JSON.stringify({ ok: true, service: 'app' });
@@ -217,6 +234,62 @@ export async function deliveryHandlerFromEnv(
   };
 }
 
+export async function uiFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+  log: (line: string) => void = console.log,
+): Promise<Omit<UiRouteOptions, 'publicUrl' | 'store'> | undefined> {
+  if (!env.DATABASE_URL) return undefined;
+  const db: Kysely<Database> = createDb(env.DATABASE_URL, { max: 4 });
+  const jobs = await startJobs(env.DATABASE_URL, { log });
+  const mirrorsDir = env.OXYBOOK_MIRRORS_DIR ?? path.join(REPO_ROOT, '.oxybook-mirrors');
+  const sitesDir = env.OXYBOOK_SITES_DIR ?? path.join(REPO_ROOT, '.oxybook-sites');
+  const sitesDomain = env.OXYBOOK_SITES_DOMAIN ?? 'docs.localhost';
+  const githubUrl = env.OXYBOOK_GITHUB_URL ?? 'https://github.com';
+  const tokenFor = env.OXYBOOK_SECRET_KEY ? storedAppTokens(db, env.OXYBOOK_SECRET_KEY) : null;
+
+  return {
+    db,
+    ...(env.OXYBOOK_SECRET_KEY ? { secretKey: env.OXYBOOK_SECRET_KEY } : {}),
+    sitesDomain,
+    ...(env.CADDY_PORT ? { sitesPort: env.CADDY_PORT } : {}),
+    onSpaceSync: async ({ spaceId, ref, syncNow }) => {
+      if (syncNow && tokenFor) {
+        await runSpaceSync(
+          {
+            db,
+            tokenFor,
+            githubUrl,
+            mirrorsDir,
+            log,
+          },
+          spaceId,
+          ref,
+        );
+        await runSpaceBuild(
+          {
+            db,
+            tokenFor,
+            githubUrl,
+            mirrorsDir,
+            sitesDir,
+            sitesDomain,
+            log,
+          },
+          spaceId,
+          { version: 'default', ref },
+        );
+        return { synced: true, built: true };
+      }
+      const jobId = await jobs.send(
+        'sync',
+        { spaceId, ref, reason: 'manual' },
+        { singletonKey: syncKey(spaceId, ref) },
+      );
+      return { jobId };
+    },
+  };
+}
+
 if (invokedDirectly()) {
   const port = Number(process.env.PORT ?? 3000);
   migrateOnStart()
@@ -224,7 +297,13 @@ if (invokedDirectly()) {
       for (const name of applied) console.log(`migrated ${name}`);
       const credentials = await appCredentialsFromEnv();
       const onDelivery = await deliveryHandlerFromEnv();
-      return startAppServer({ port, ...credentials, ...(onDelivery ? { onDelivery } : {}) });
+      const ui = await uiFromEnv();
+      return startAppServer({
+        port,
+        ...credentials,
+        ...(onDelivery ? { onDelivery } : {}),
+        ...(ui ? { ui } : {}),
+      });
     })
     .then(({ port: bound }) => {
       console.log(`app listening on ${bound}`);
