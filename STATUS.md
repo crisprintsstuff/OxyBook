@@ -100,6 +100,8 @@ Live, from this session, without a token (the repo is public): `syncSpace` on `h
 
 Not measured: the installation token path (worker on the owner's machine with the stored App), a webhook-triggered sync end to end, and the container image.
 
+CI on the first push of this change: one `check` run passed and one failed on the same commit (`a5203b7`/`73e066a`, run 40990492750). Cause: test files in `apps/server` ran in parallel, and Kysely's migrator scans every schema while another file dropped its throwaway schema (`schema "oxybook_test_…" does not exist`). Reproduced locally: 21 of 40 migrations failed under concurrent schema drops. Database test files now run one at a time (`--test-concurrency=1`). Details are in `docs/M1-NOTES.md`.
+
 ### 2026-10-30 — Space `cris/test` created; the queue round-trips on the owner's machine
 
 Run by the repo owner on their machine against the compose `postgres` service, with `pnpm dev` running after #18 (`main` at `748b0b3f58025ad9eec5c0d8859d20919091a5ce`). Node v22.23.1.

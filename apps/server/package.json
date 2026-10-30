@@ -8,7 +8,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync build && tsc -p tsconfig.json --noEmit",
-    "test": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync build && node --import tsx --test test/*.test.ts",
+    "test": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync build && node --import tsx --test --test-concurrency=1 test/*.test.ts",
     "dev": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync build && tsx watch src/main.ts",
     "dev:watch": "tsx watch src/main.ts",
     "start": "node dist/main.js"

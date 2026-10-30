@@ -95,3 +95,7 @@ Date: 2026-10-30. Details and numbers are in `STATUS.md`.
 - **§4.2 `blobs(sha PK, bytes)`.** Keyed by `(org_id, sha)` since schema v0 (see M0-NOTES.md).
 - **§2.5 inferred redirects.** The text does not say where they are kept. They are in `inferred_redirects`, keyed by `(space_id, ref, from_url)`, until slice 6 serves them and an admin commits them to `oxybook.yml`.
 - **§2.2 `exclude:` in `oxybook.yml`.** Not applied by sync yet. `oxybook.yml` is not read until the build (slice 6).
+
+### Sharp edge: migrations and concurrent schema drops
+
+Kysely's migrator checks for its bookkeeping table with `introspector.getTables()`, which scans every schema in the database and calls `has_schema_privilege` on each. When another session drops a schema during that scan, the migration fails with `schema "<someone else's schema>" does not exist` (SQLSTATE 3F000). Measured 2026-10-30: 21 of 40 migrations failed while a second connection created and dropped schemas in a loop. CI hit this once on #20, because test files in one package ran in parallel, and each creates and drops a throwaway schema. Packages that use the database now run their test files with `--test-concurrency=1`. In production nothing drops schemas while the app starts. If something ever does, migrate-on-start will fail with that message, and a restart will succeed.
