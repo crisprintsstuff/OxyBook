@@ -2,7 +2,7 @@
 
 import { type Database, deriveSecretsKey, type Kysely, loadAppCredentials } from '@oxybook/db';
 import { InstallationTokenCache, signAppJwt } from '@oxybook/github';
-import { mirrorPath, remoteHead } from './mirror.js';
+import { mirrorBlobSource, mirrorPath, remoteHead } from './mirror.js';
 import { type SyncResult, syncSpace } from './sync.js';
 
 export interface SyncEnvironment {
@@ -81,6 +81,13 @@ async function loadSpace(db: Kysely<Database>, spaceId: string): Promise<SpaceSo
 
 function remoteUrl(env: SyncEnvironment, space: SpaceSource): string {
   return `${env.githubUrl.replace(/\/$/, '')}/${space.owner}/${space.repo}.git`;
+}
+
+/** Blob reads from a space's mirror, with its installation token, for drafts. */
+export async function spaceBlobSource(env: SyncEnvironment, spaceId: string) {
+  const space = await loadSpace(env.db, spaceId);
+  const token = await env.tokenFor(space.installationId);
+  return mirrorBlobSource(mirrorPath(env.mirrorsDir, space.owner, space.repo), token);
 }
 
 /** Sync one space's ref. The unit of work behind the `sync` job and `oxybook-admin sync`. */

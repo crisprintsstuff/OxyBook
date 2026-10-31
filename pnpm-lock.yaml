@@ -57,6 +57,9 @@ importers:
       '@oxybook/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@oxybook/drafts':
+        specifier: workspace:*
+        version: link:../../packages/drafts
       '@oxybook/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs
