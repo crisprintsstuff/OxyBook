@@ -30,6 +30,11 @@ export interface CommitFilesRequest {
   author: ProposeAuthor;
   message: string;
   /**
+   * Parents of the new commit. Default `[base]`. The tree is always `base` plus the
+   * changes; a follow-up commit on a PR branch passes the branch head instead.
+   */
+  parents?: readonly string[];
+  /**
    * Add `Signed-off-by: <author>`. Only when the human ticked the affirmation in the
    * propose dialog (ARCHITECTURE §4.1): a sign-off is the human's statement, not the bot's.
    */
@@ -153,6 +158,7 @@ export function commitFiles(request: CommitFilesRequest): CommitFilesResult {
     }
     const tree = runGit(request.mirrorDir, ['write-tree'], env).trim();
     if (tree === baseTree) throw new GuardError('refusing a commit that changes nothing');
+    const parents = request.parents ?? [request.base];
     const ident = {
       GIT_AUTHOR_NAME: request.author.name,
       GIT_AUTHOR_EMAIL: request.author.email,
@@ -161,7 +167,15 @@ export function commitFiles(request: CommitFilesRequest): CommitFilesResult {
     };
     const commit = runGit(
       request.mirrorDir,
-      ['-c', 'commit.gpgsign=false', 'commit-tree', tree, '-p', request.base, '-F', '-'],
+      [
+        '-c',
+        'commit.gpgsign=false',
+        'commit-tree',
+        tree,
+        ...parents.flatMap((p) => ['-p', p]),
+        '-F',
+        '-',
+      ],
       ident,
       Buffer.from(commitMessage(request.message, request.author, request.signOff === true)),
     ).trim();
@@ -238,4 +252,60 @@ export function mergeFile3(base: Buffer, ours: Buffer, theirs: Buffer): MergeOut
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+}
+
+export type MergeCommitsOutcome =
+  | { clean: true; commit: string; tree: string }
+  | { clean: false; conflictedPaths: string[] };
+
+/**
+ * A merge commit of `theirs` (a PR branch someone else pushed to) and `ours`, without a
+ * work tree (ARCHITECTURE §4.5 step 3): history on a branch someone else pushed to is
+ * never rewritten. `git merge-tree --write-tree` prints a tree id even when it exits 1;
+ * that tree holds conflict markers or resurrected files and is never committed.
+ */
+export function mergeCommits(input: {
+  mirrorDir: string;
+  theirs: string;
+  ours: string;
+  author: ProposeAuthor;
+  message: string;
+}): MergeCommitsOutcome {
+  const result = spawnSync(
+    'git',
+    ['merge-tree', '--write-tree', '--name-only', '--no-messages', input.theirs, input.ours],
+    { cwd: input.mirrorDir, encoding: 'utf8' },
+  );
+  if (result.status === 1) {
+    const lines = result.stdout.split('\n').filter((line) => line.length > 0);
+    return { clean: false, conflictedPaths: lines.slice(1) };
+  }
+  if (result.status !== 0) {
+    throw new Error(`git merge-tree failed: ${result.stderr || result.error?.message}`);
+  }
+  const tree = result.stdout.split('\n')[0]?.trim() ?? '';
+  const ident = {
+    GIT_AUTHOR_NAME: input.author.name,
+    GIT_AUTHOR_EMAIL: input.author.email,
+    GIT_COMMITTER_NAME: input.author.name,
+    GIT_COMMITTER_EMAIL: input.author.email,
+  };
+  const commit = runGit(
+    input.mirrorDir,
+    [
+      '-c',
+      'commit.gpgsign=false',
+      'commit-tree',
+      tree,
+      '-p',
+      input.theirs,
+      '-p',
+      input.ours,
+      '-F',
+      '-',
+    ],
+    ident,
+    Buffer.from(`${input.message.trimEnd()}\n`),
+  ).trim();
+  return { clean: true, commit, tree };
 }

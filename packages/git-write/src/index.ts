@@ -6,7 +6,9 @@ export {
   commitFiles,
   commitMessage,
   type FileChange,
+  type MergeCommitsOutcome,
   type MergeOutcome,
+  mergeCommits,
   mergeFile3,
 } from './commit.js';
 export { GitCommandError, runGit, StaleLeaseError } from './git.js';
