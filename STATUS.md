@@ -52,7 +52,7 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 Still unverified. These are not the exit sentence, and they are not done:
 
 - **Manifest-created App.** Verified 2026-10-30: `oxybook-cris` was created from `/setup/github`, stored, installed on `oxybook-test`, and opened [oxybook-test#2](https://github.com/crisprintsstuff/oxybook-test/pull/2).
-- **Webhook delivery** from GitHub to `/api/github/webhooks`. Verified 2026-10-30 for `ping`, `installation`, `push`, and `pull_request` through the owner's Cloudflare tunnel. Nothing acts on a delivery yet.
+- **Webhook delivery** from GitHub to `/api/github/webhooks`. Verified 2026-10-30 for `ping`, `installation`, `push`, and `pull_request` through the owner's Cloudflare tunnel. A verified `push` to a space's default branch queues `sync`, which chains `build` (M1).
 - **Git Database API fallback** on a repo whose ruleset requires signed commits. Unverified on `oxybook-test`. That repo has no ruleset. The earlier measurement was on this repo. See `docs/M0-GITHUB-SPIKE.md`.
 - **Database schema v0 and migrations** (Kysely + SQL migrations). Done 2026-10-30 in `packages/db`, measured on a local PostgreSQL 16 and the compose `postgres:17` image. CI runs the tests against a `postgres:17` service. The rebuilt image migrates an empty database at start and also starts against an already-migrated one.
 - **OAuth callback path.** Closed 2026-10-30: `/api/github/oauth/callback` answers 501 `Sign in with GitHub is not implemented yet`. Sign in with GitHub is M2.
@@ -82,6 +82,19 @@ In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages
 **Done when:** an end-to-end test edits one paragraph in an `.mdx` page containing JSX components, raw HTML and unusual frontmatter, and the resulting PR diff touches only that paragraph's lines; a non-GitHub user can propose a change that a GitHub user then merges, and the site updates.
 
 ## Changelog
+
+### 2026-10-31 — Independent check of M1 slices 5–9 and M2 slice 1
+
+Run in an agent session, not on the owner's machine. `main` at `feef209` (M2 slice 1). Node v22.22.0, local PostgreSQL 16.
+
+- CI `check` was green on all six commits from `a8d4cee` (renderer v0) through `feef209`.
+- `pnpm install --frozen-lockfile`, `pnpm lint`, and `pnpm typecheck` exited 0. `pnpm test` exited 0 with 112 tests in 11 suites, matching the M2 slice 1 entry.
+- `pnpm test:corpus`: identity 594 pass, 0 fail, 1 unparseable (fixtures 27/28, docusaurus 89, starlight 338, vitepress 36, mkdocs 19, mkdocs-material 85). The corpus render summary was `starting clean=286/567, M1 clean=352/567, M1+code-group clean=353/567`, matching `docs/M1-NOTES.md`.
+- The M2 slice 1 claim that the editor bridge round-trips the whole corpus was re-measured with a throwaway script (not committed): `openEditorDocument` then `serializeEditorState` on every file under `corpus/fixtures` and the five pinned corpus trees gave 594 byte-identical, 0 different, and 1 `source-only` (`unterminated.mdx`, `unparseable`). That matches the claim.
+- Gap: CI does not run that check. `packages/doc-model/test/editor-doc.test.ts` covers the 28 committed fixtures, and `pnpm test:corpus` checks `parse`/`serialize` identity and rendering, not the editor bridge. A bridge regression that only shows on corpus files would pass CI.
+- Corrected one stale line under "M0 exit, met". Webhook delivery said "Nothing acts on a delivery yet". A verified push now queues sync and build.
+
+Not re-run here: anything on the owner's machine (the M1 exit run, Caddy serving `test.docs.localhost:8180`, the live webhooks).
 
 ### 2026-10-30 — M2 slice 1: editor document model and dirty-block bridge (`packages/doc-model`)
 
