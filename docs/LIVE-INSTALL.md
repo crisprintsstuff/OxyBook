@@ -266,3 +266,12 @@ pnpm oxybook-dev propose path/to/page.md \
 The push goes to `refs/heads/oxybook/<user>/<slug>-<id>` with `--force-with-lease`. The base branch is not pushed. The pull request `head` is that `oxybook/*` branch and the `base` is `--base` (default `main`). The body lists the pages changed and the link back. The command prints the pull request URL as `pr https://github.com/<owner>/<repo>/pull/<n>`.
 
 The installation token is used for the push and for `POST /repos/<owner>/<repo>/pulls`. It is not printed. The clone URL stored in the mirror is the `--remote` you passed, without the token. A `file://` remote is refused when `--github-owner` is set: that push cannot become a GitHub pull request.
+
+## Link GitHub and sign in with it
+
+The App created from `/setup/github` already has the callback URL `<OXYBOOK_PUBLIC_URL>/api/github/oauth/callback`. If you created the App by hand, or changed `OXYBOOK_PUBLIC_URL`, set **Callback URL** on the App's settings page to that address.
+
+1. Sign in with your email, then on the dashboard click **Link GitHub account** and authorize on GitHub. The dashboard then shows **Linked as @<login>**.
+2. From then on, **Sign in with GitHub** on the login page signs you in. It never creates an account: link first.
+3. Pull requests you propose are opened as you when your GitHub account can write to the repository, and their commits carry your GitHub noreply address. Otherwise the App opens them. **Unlink GitHub** on the dashboard switches back to the App.
+
