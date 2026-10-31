@@ -21,6 +21,16 @@ export {
   manifestCreateUrl,
 } from './manifest.js';
 export {
+  authorizeUrl,
+  exchangeOAuthCode,
+  fetchGithubUser,
+  type GithubUser,
+  githubNoreplyEmail,
+  OAuthError,
+  refreshUserToken,
+  type UserToken,
+} from './oauth.js';
+export {
   type OpenedPullRequest,
   type OpenPullRequestInput,
   openPullRequest,
