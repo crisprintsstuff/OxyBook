@@ -8,6 +8,17 @@ export {
   describeDatabaseUrl,
 } from './connect.js';
 export {
+  GithubAccountTaken,
+  githubLoginOf,
+  type LinkedGithubAccount,
+  linkGithubAccount,
+  loadGithubAccount,
+  type StoredUserToken,
+  unlinkGithubAccount,
+  updateGithubTokens,
+  userByGithubId,
+} from './github-accounts.js';
+export {
   deriveSecretsKey,
   loadAppCredentials,
   open,

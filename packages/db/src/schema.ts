@@ -16,6 +16,7 @@ export interface Database {
   drafts: DraftsTable;
   draft_files: DraftFilesTable;
   github_app: GithubAppTable;
+  github_accounts: GithubAccountsTable;
   webhook_deliveries: WebhookDeliveriesTable;
   inferred_redirects: InferredRedirectsTable;
   builds: BuildsTable;
@@ -193,4 +194,18 @@ export interface BuildsTable {
   log: Generated<string>;
   created_at: CreatedAt;
   finished_at: ColumnType<Date | null, Date | string | null | undefined, Date | string | null>;
+}
+
+/** 0006_github_accounts. `*_enc` columns are AES-256-GCM sealed. */
+export interface GithubAccountsTable {
+  user_id: string;
+  /** bigint arrives from pg as a string. */
+  github_user_id: ColumnType<string, string | number, string | number>;
+  login: string;
+  access_token_enc: Buffer;
+  access_expires_at: Date | null;
+  refresh_token_enc: Buffer | null;
+  refresh_expires_at: Date | null;
+  linked_at: CreatedAt;
+  updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
 }
