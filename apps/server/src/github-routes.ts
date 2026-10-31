@@ -133,13 +133,6 @@ export function createGithubRoutes(options: GithubRouteOptions): {
         });
         return true;
       }
-      if (request.method === 'GET' && url.pathname === '/api/github/oauth/callback') {
-        // The manifest registers this path for "Sign in with GitHub" (ARCHITECTURE §7).
-        // That flow is M2. Answer plainly instead of 404 so the gap is visible.
-        response.writeHead(501, { 'content-type': 'text/plain; charset=utf-8' });
-        response.end('Sign in with GitHub is not implemented yet');
-        return true;
-      }
       if (request.method === 'POST' && url.pathname === '/api/github/webhooks') {
         const secret = store.get()?.webhookSecret ?? process.env.GITHUB_APP_WEBHOOK_SECRET ?? '';
         const header = headerValue(request.headers['x-hub-signature-256']);
