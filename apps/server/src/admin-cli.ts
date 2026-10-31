@@ -7,6 +7,7 @@ import { buildKey, startJobs, syncKey } from '@oxybook/jobs';
 import { runSpaceBuild } from '@oxybook/renderer';
 import { runSpaceSync, storedAppTokens } from '@oxybook/sync';
 import { createOrg, createSpace, listSpaces, lookupInstallation, parseRepo } from './admin.js';
+import { draftCommand } from './admin-drafts.js';
 import { runM1Exit } from './m1-exit.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
@@ -19,6 +20,9 @@ const USAGE = `usage:
   oxybook-admin sync <org>/<space> [--now]
   oxybook-admin build <org>/<space> [--now]
   oxybook-admin pages <org>/<space>
+  oxybook-admin draft save <org>/<space> <repo-path> --user <email> (--file <local> | --delete)
+  oxybook-admin draft show <org>/<space> --user <email>
+  oxybook-admin draft propose <org>/<space> --user <email> --title "<PR title>" [--sign-off]
   oxybook-admin job ping
   oxybook-admin m1-exit
 
@@ -126,6 +130,23 @@ export async function main(argv: readonly string[], env = process.env): Promise<
         `space ${orgSlug}/${slug} ${space.id} -> ${owner}/${repo} (installation ${installationId})`,
       );
       return 0;
+    }
+    if (noun === 'draft') {
+      const space = await findSpace(db, args[2]);
+      return await draftCommand({
+        db,
+        env: {
+          db,
+          tokenFor: storedAppTokens(db, env.OXYBOOK_SECRET_KEY),
+          githubUrl: env.OXYBOOK_GITHUB_URL ?? 'https://github.com',
+          mirrorsDir: env.OXYBOOK_MIRRORS_DIR ?? path.resolve('.oxybook-mirrors'),
+        },
+        jobs: () => startJobs(databaseUrlFromEnv(env), { log: () => {} }),
+        space,
+        verb,
+        args,
+        flag: (name) => flag(args, name),
+      });
     }
     if (noun === 'sync') {
       const space = await findSpace(db, verb);

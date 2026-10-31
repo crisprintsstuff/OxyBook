@@ -7,6 +7,7 @@ export {
   DraftStateError,
   DraftVersionConflict,
   discardDraft,
+  findOpenDraft,
   getDraft,
   listDraftFiles,
   OPEN_STATES,
@@ -16,6 +17,19 @@ export {
   type SaveFileInput,
   saveDraftFile,
 } from './drafts.js';
+export {
+  applyPullRequestEvent,
+  assertCanPropose,
+  draftBranch,
+  type ProposeEnvironment,
+  ProposeForbidden,
+  type ProposeInput,
+  type ProposeOutcome,
+  ProposeRetry,
+  type PullRequestEvent,
+  proposeDraft,
+  spaceRoleOf,
+} from './propose.js';
 export {
   type BlobSource,
   draftDiff,

@@ -16,6 +16,7 @@
   "dependencies": {
     "@oxybook/db": "workspace:*",
     "@oxybook/drafts": "workspace:*",
+    "@oxybook/github": "workspace:*",
     "@oxybook/jobs": "workspace:*",
     "@oxybook/renderer": "workspace:*",
     "@oxybook/sync": "workspace:*"

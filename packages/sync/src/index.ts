@@ -4,9 +4,11 @@ export { authEnv, GitError } from './git.js';
 export {
   fetchRef,
   findRenames,
+  LeaseRejected,
   listFiles,
   mirrorBlobSource,
   mirrorPath,
+  pushBranch,
   type Rename,
   readBlobs,
   remoteHead,
@@ -29,6 +31,7 @@ export {
   runSpaceSync,
   type SyncEnvironment,
   spaceBlobSource,
+  spaceGit,
   storedAppTokens,
 } from './runner.js';
 export { type SyncResult, type SyncTarget, syncSpace } from './sync.js';

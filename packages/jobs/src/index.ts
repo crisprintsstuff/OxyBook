@@ -26,13 +26,22 @@ export interface JobPayloads {
     ref: string;
     reason: 'sync' | 'manual';
   };
+  /** Push a draft to its oxybook/* branch and open or update its PR (ARCHITECTURE §4.3). */
+  propose: {
+    draftId: string;
+    /** Who clicked Propose; must own the draft and be an editor or admin. */
+    userId: string;
+    title: string;
+    /** The user ticked the DCO affirmation. */
+    signOff: boolean;
+  };
   /** Compare every space's remote head with ref_state and queue syncs for the ones behind. */
   reconcile: { at?: string };
 }
 
 export type QueueName = keyof JobPayloads;
 
-export const QUEUE_NAMES: readonly QueueName[] = ['ping', 'sync', 'build', 'reconcile'];
+export const QUEUE_NAMES: readonly QueueName[] = ['ping', 'sync', 'build', 'propose', 'reconcile'];
 
 /**
  * `sync` is `stately` with singletonKey `<space>:<ref>`: at most one queued and one active
@@ -47,6 +56,8 @@ const QUEUE_OPTIONS: Record<
   ping: {},
   sync: { policy: 'stately', retryLimit: 3, retryDelay: 30, retryBackoff: true },
   build: { policy: 'stately', retryLimit: 2, retryDelay: 15, retryBackoff: true },
+  // One propose per draft at a time. Retries cover a base or branch that moved mid-job.
+  propose: { policy: 'stately', retryLimit: 3, retryDelay: 10, retryBackoff: true },
   reconcile: { policy: 'singleton', retryLimit: 0 },
 };
 
@@ -151,4 +162,9 @@ async function ensureQueue(boss: PgBoss, name: QueueName): Promise<void> {
     // app and worker start together; whoever loses the race finds the queue there.
     if (!(await boss.getQueue(name))) throw error;
   }
+}
+
+/** One propose job queued and one running per draft. */
+export function proposeKey(draftId: string): string {
+  return `propose:${draftId}`;
 }

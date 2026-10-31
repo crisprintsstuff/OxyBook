@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge in `packages/doc-model`, and drafts in `packages/drafts` with multi-file commits in `packages/git-write`) are done; next is slice 3 (propose job, `pull_request` webhooks, Sign in with GitHub, roles). `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3a (propose job, `pull_request` webhooks, editor/viewer on propose) are done; next is slice 3b (Sign in with GitHub, user-authored PRs) and a live propose on `oxybook-test`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
@@ -37,7 +37,7 @@ apps/worker            AGPL   worker process. /healthz; works jobs from the queu
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLIs (oxybook-roundtrip, oxybook-check).
 packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.
 packages/git-write      AGPL   multi-file commit from a temporary index (guards, DCO), 3-way file merge, push to oxybook/*.
-packages/drafts         AGPL   drafts: If-Match saves, diff preview, open-draft lookup, 3-way rebase when the base moves.
+packages/drafts         AGPL   drafts: If-Match saves, diff preview, 3-way rebase, propose (push oxybook/* + PR), pull_request events.
 packages/db             AGPL   schema v0 as plain SQL migrations, Kysely types and connection, migrator.
 packages/jobs           AGPL   job queue on PostgreSQL (pg-boss): queue names, payload types, send/work.
 packages/sync           AGPL   read path: blobless mirror, page rules (URLs, titles), sync into blobs/pages/ref_state.
@@ -72,6 +72,7 @@ pnpm oxybook-admin space list   # org/space setup without UI; `job ping` round-t
 pnpm oxybook-admin sync <org>/<space> [--now]   # queue (or run here) a sync; `pages <org>/<space>` lists the result
 pnpm oxybook-admin build <org>/<space> [--now]  # queue (or run here) a static site build into OXYBOOK_SITES_DIR
 pnpm m1:exit                  # run the M1 exit verification against the test repo and Caddy
+pnpm oxybook-admin draft save|show|propose <org>/<space> --user <email> …  # write path without the editor
 pnpm oxybook-check <dir>      # what would render as a placeholder, file:line
 pnpm compat:corpus           # the H3 report over corpus/cache; run test:corpus first
 pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git

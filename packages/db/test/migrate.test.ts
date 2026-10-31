@@ -34,7 +34,7 @@ describe('schema v0 migrations', { skip: url ? false : 'DATABASE_URL is not set'
 
   it('applies every migration once, then is a no-op', async () => {
     assert.deepEqual(await migrateToLatest(db, { schema }), {
-      applied: ['0001_schema_v0', '0002_github_app', '0003_sync', '0004_builds'],
+      applied: ['0001_schema_v0', '0002_github_app', '0003_sync', '0004_builds', '0005_propose'],
     });
     assert.deepEqual(await migrateToLatest(db, { schema }), { applied: [] });
     const tables = await sql<{ table_name: string }>`

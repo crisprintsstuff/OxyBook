@@ -177,3 +177,55 @@ export function mirrorBlobSource(mirrorDir: string, token?: string) {
     },
   };
 }
+
+/** The remote moved since we looked: `--force-with-lease` refused to overwrite it. */
+export class LeaseRejected extends Error {
+  constructor(
+    readonly ref: string,
+    readonly expected: string,
+  ) {
+    super(
+      `push to ${ref} refused: it is no longer at ${expected || 'nothing'}; someone pushed meanwhile`,
+    );
+    this.name = 'LeaseRejected';
+  }
+}
+
+/**
+ * Push one commit to `refs/heads/<branch>` on the mirror's origin (ARCHITECTURE §4.3 step
+ * 3). Every push carries `--force-with-lease=<ref>:<expected>`; an empty `expected` means
+ * the branch must not exist yet. Only `oxybook/*` branches are pushed, never a base branch.
+ */
+export async function pushBranch(input: {
+  mirrorDir: string;
+  commit: string;
+  branch: string;
+  expected: string;
+  token?: string;
+}): Promise<void> {
+  if (!/^oxybook\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(input.branch)) {
+    throw new Error(
+      `refusing to push ${input.branch}; only oxybook/<user>/<slug> branches are written`,
+    );
+  }
+  const ref = `refs/heads/${input.branch}`;
+  try {
+    await git(
+      input.mirrorDir,
+      [
+        'push',
+        '--quiet',
+        'origin',
+        `${input.commit}:${ref}`,
+        `--force-with-lease=${ref}:${input.expected}`,
+      ],
+      { env: authEnv(input.token) },
+    );
+  } catch (error) {
+    const text = error instanceof Error ? error.message : String(error);
+    if (/stale info|fetch first|non-fast-forward|rejected/.test(text)) {
+      throw new LeaseRejected(ref, input.expected);
+    }
+    throw error;
+  }
+}

@@ -6,7 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
-import { commitFiles, mergeFile3 } from '../src/commit.js';
+import { commitFiles, mergeCommits, mergeFile3 } from '../src/commit.js';
 import { GuardError } from '../src/propose.js';
 
 function git(cwd: string, ...args: string[]): string {
@@ -265,5 +265,84 @@ describe('mergeFile3', () => {
     const png = (n: number) => Buffer.from([0x89, 0x50, 0, n]);
     const binary = mergeFile3(png(1), png(2), png(3));
     assert.ok(!binary.clean && binary.reason === 'binary');
+  });
+});
+
+describe('follow-up and merge commits on a PR branch', () => {
+  const tmp = mkdtempSync(path.join(tmpdir(), 'oxybook-merge-commit-'));
+  const work = path.join(tmp, 'work');
+  const mirror = path.join(tmp, 'mirror.git');
+  const author = { name: 'Writer', email: 'writer@example.com' };
+  const page = '# Guide\n\nOne.\n\nTwo.\n\nThree.\n';
+  let base = '';
+
+  before(() => {
+    git(tmp, 'init', '--quiet', '-b', 'main', work);
+    mkdirSync(path.join(work, 'docs'), { recursive: true });
+    writeFileSync(path.join(work, 'docs/guide.md'), page);
+    git(work, 'add', '-A');
+    git(work, 'commit', '--quiet', '-m', 'base');
+    git(tmp, 'clone', '--quiet', '--bare', work, mirror);
+    base = git(mirror, 'rev-parse', 'main').trim();
+  });
+
+  after(() => rmSync(tmp, { recursive: true, force: true }));
+
+  const edit = (text: string, parents?: string[]) =>
+    commitFiles({
+      mirrorDir: mirror,
+      base,
+      contentRoot: 'docs',
+      author,
+      message: 'edit',
+      changes: [{ op: 'modify', path: 'docs/guide.md', bytes: Buffer.from(text) }],
+      ...(parents ? { parents } : {}),
+    });
+
+  it('builds a follow-up commit on the previous PR commit, with the full draft tree', () => {
+    const first = edit(page.replace('One.', 'One, edited.'));
+    const second = edit(page.replace('One.', 'One, edited.').replace('Two.', 'Two, edited.'), [
+      first.commit,
+    ]);
+    assert.equal(git(mirror, 'rev-parse', `${second.commit}^`).trim(), first.commit);
+    assert.equal(
+      git(mirror, 'diff', '--name-only', first.commit, second.commit).trim(),
+      'docs/guide.md',
+    );
+    assert.match(
+      git(mirror, 'show', `${second.commit}:docs/guide.md`),
+      /One, edited\.[\s\S]*Two, edited\./,
+    );
+  });
+
+  it("merges someone else's branch commit without rewriting it, or reports the conflict", () => {
+    const ours = edit(page.replace('One.', 'One, from OxyBook.'));
+    const theirsClean = edit(page.replace('Three.', 'Three, pushed by a developer.'));
+    const merged = mergeCommits({
+      mirrorDir: mirror,
+      theirs: theirsClean.commit,
+      ours: ours.commit,
+      author,
+      message: 'Merge',
+    });
+    assert.ok(merged.clean);
+    assert.deepEqual(
+      git(mirror, 'rev-list', '--parents', '-n', '1', merged.commit).trim().split(' ').slice(1),
+      [theirsClean.commit, ours.commit],
+      'their commit stays in history as the first parent',
+    );
+    assert.equal(
+      git(mirror, 'show', `${merged.commit}:docs/guide.md`),
+      '# Guide\n\nOne, from OxyBook.\n\nTwo.\n\nThree, pushed by a developer.\n',
+    );
+    const theirsClash = edit(page.replace('One.', 'One, rewritten by a developer.'));
+    const clash = mergeCommits({
+      mirrorDir: mirror,
+      theirs: theirsClash.commit,
+      ours: ours.commit,
+      author,
+      message: 'Merge',
+    });
+    assert.deepEqual(clash, { clean: false, conflictedPaths: ['docs/guide.md'] });
   });
 });
