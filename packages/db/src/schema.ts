@@ -129,6 +129,11 @@ export interface DraftsTable {
   version: Generated<number>;
   created_at: CreatedAt;
   updated_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  /** 0005_propose: what OxyBook last pushed to `branch`, and the base it was built on. */
+  pushed_sha: string | null;
+  pushed_base_sha: string | null;
+  pr_url: string | null;
+  propose_error: string | null;
 }
 
 export type DraftFileOp = 'add' | 'modify' | 'delete' | 'rename';

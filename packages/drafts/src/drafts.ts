@@ -56,6 +56,10 @@ export interface Draft {
   prNumber: number | null;
   state: DraftState;
   version: number;
+  pushedSha: string | null;
+  pushedBaseSha: string | null;
+  prUrl: string | null;
+  proposeError: string | null;
 }
 
 export interface DraftFile {
@@ -68,7 +72,7 @@ export interface DraftFile {
 
 type Executor = Kysely<Database>;
 
-function toDraft(row: {
+export function toDraft(row: {
   id: string;
   org_id: string;
   space_id: string;
@@ -79,6 +83,10 @@ function toDraft(row: {
   pr_number: number | null;
   state: DraftState;
   version: number;
+  pushed_sha: string | null;
+  pushed_base_sha: string | null;
+  pr_url: string | null;
+  propose_error: string | null;
 }): Draft {
   return {
     id: row.id,
@@ -91,10 +99,14 @@ function toDraft(row: {
     prNumber: row.pr_number,
     state: row.state,
     version: row.version,
+    pushedSha: row.pushed_sha,
+    pushedBaseSha: row.pushed_base_sha,
+    prUrl: row.pr_url,
+    proposeError: row.propose_error,
   };
 }
 
-const DRAFT_COLUMNS = [
+export const DRAFT_COLUMNS = [
   'id',
   'org_id',
   'space_id',
@@ -105,6 +117,10 @@ const DRAFT_COLUMNS = [
   'pr_number',
   'state',
   'version',
+  'pushed_sha',
+  'pushed_base_sha',
+  'pr_url',
+  'propose_error',
 ] as const;
 
 export async function getDraft(db: Executor, draftId: string): Promise<Draft | null> {
@@ -112,6 +128,22 @@ export async function getDraft(db: Executor, draftId: string): Promise<Draft | n
     .selectFrom('drafts')
     .select(DRAFT_COLUMNS)
     .where('id', '=', draftId)
+    .executeTakeFirst();
+  return row ? toDraft(row) : null;
+}
+
+/** The user's open draft on (space, ref), if there is one. Never creates a draft. */
+export async function findOpenDraft(
+  db: Executor,
+  input: { spaceId: string; userId: string; baseRef: string },
+): Promise<Draft | null> {
+  const row = await db
+    .selectFrom('drafts')
+    .select(DRAFT_COLUMNS)
+    .where('space_id', '=', input.spaceId)
+    .where('user_id', '=', input.userId)
+    .where('base_ref', '=', input.baseRef)
+    .where('state', 'in', OPEN_STATES)
     .executeTakeFirst();
   return row ? toDraft(row) : null;
 }
