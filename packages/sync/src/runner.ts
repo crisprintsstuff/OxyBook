@@ -2,7 +2,7 @@
 
 import { type Database, deriveSecretsKey, type Kysely, loadAppCredentials } from '@oxybook/db';
 import { InstallationTokenCache, signAppJwt } from '@oxybook/github';
-import { mirrorBlobSource, mirrorPath, remoteHead } from './mirror.js';
+import { fetchRef, mirrorBlobSource, mirrorPath, pushBranch, remoteHead } from './mirror.js';
 import { type SyncResult, syncSpace } from './sync.js';
 
 export interface SyncEnvironment {
@@ -88,6 +88,30 @@ export async function spaceBlobSource(env: SyncEnvironment, spaceId: string) {
   const space = await loadSpace(env.db, spaceId);
   const token = await env.tokenFor(space.installationId);
   return mirrorBlobSource(mirrorPath(env.mirrorsDir, space.owner, space.repo), token);
+}
+
+/**
+ * Git access to a space's repository for the write path: the shared blobless mirror,
+ * authenticated with the space's installation token on every call.
+ */
+export async function spaceGit(env: SyncEnvironment, spaceId: string) {
+  const space = await loadSpace(env.db, spaceId);
+  const token = await env.tokenFor(space.installationId);
+  const mirrorDir = mirrorPath(env.mirrorsDir, space.owner, space.repo);
+  const url = remoteUrl(env, space);
+  const auth = token ? { token } : {};
+  return {
+    owner: space.owner,
+    repo: space.repo,
+    installationId: space.installationId,
+    token,
+    mirrorDir,
+    fetch: (branch: string) => fetchRef({ mirrorDir, remoteUrl: url, ref: branch, ...auth }),
+    remoteHead: (branch: string) => remoteHead({ remoteUrl: url, ref: branch, ...auth }),
+    push: (commit: string, branch: string, expected: string) =>
+      pushBranch({ mirrorDir, commit, branch, expected, ...auth }),
+    blobs: mirrorBlobSource(mirrorDir, token),
+  };
 }
 
 /** Sync one space's ref. The unit of work behind the `sync` job and `oxybook-admin sync`. */
