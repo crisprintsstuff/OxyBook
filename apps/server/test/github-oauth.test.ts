@@ -183,10 +183,7 @@ describe('Sign in with GitHub and account linking', {
 
     github.state.who = { id: 42, login: 'stranger', name: 'S' };
     const refused = await roundTrip('signin', 'c3');
-    assert.match(
-      errorOf(refused),
-      /No OxyBook account is linked to GitHub @stranger/,
-    );
+    assert.match(errorOf(refused), /No OxyBook account is linked to GitHub @stranger/);
     assert.equal(cookieFrom(refused, SESSION_COOKIE_NAME), '');
     assert.equal(
       (await db.selectFrom('users').select('id').execute()).length,
@@ -200,21 +197,12 @@ describe('Sign in with GitHub and account linking', {
       '/api/github/oauth/callback?code=c4&state=abc',
       `${OAUTH_STATE_COOKIE}=signin.xyz`,
     );
-    assert.match(
-      errorOf(forged),
-      /expired or was not started here/,
-    );
+    assert.match(errorOf(forged), /expired or was not started here/);
     const noCookie = await get('/api/github/oauth/callback?code=c4&state=abc');
-    assert.match(
-      errorOf(noCookie),
-      /expired or was not started here/,
-    );
+    assert.match(errorOf(noCookie), /expired or was not started here/);
     assert.ok(!github.state.codes.includes('c4'), 'the code was never exchanged');
     const bad = await roundTrip('signin', 'bad');
-    assert.match(
-      errorOf(bad),
-      /GitHub sign-in failed: expired/,
-    );
+    assert.match(errorOf(bad), /GitHub sign-in failed: expired/);
   });
 
   it('will not link one GitHub account to two users, and unlinks with CSRF', async () => {
@@ -223,10 +211,7 @@ describe('Sign in with GitHub and account linking', {
       await signUpUser(db, { email: 'other@example.com', name: 'Other', password: 'password-1234' })
     ).id;
     const taken = await roundTrip('link', 'c5', await sessionFor(other));
-    assert.match(
-      errorOf(taken),
-      /already linked to another OxyBook user/,
-    );
+    assert.match(errorOf(taken), /already linked to another OxyBook user/);
 
     const session = await sessionFor(cris);
     const me = (await (await get('/api/auth/me', session)).json()) as { csrfToken: string };

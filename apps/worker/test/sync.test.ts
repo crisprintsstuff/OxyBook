@@ -52,7 +52,16 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
   let app: JobQueue;
   let stopWorker: () => Promise<void>;
   const lines: string[] = [];
-  const pullRequests: { url: string; body: { head: string; base: string; title: string } }[] = [];
+  const pullRequests: {
+    url: string;
+    auth: string | null;
+    body: { head: string; base: string; title: string };
+  }[] = [];
+  /** Linked GitHub accounts by OxyBook user id, and whether each may write to acme/docs. */
+  const linked = new Map<
+    string,
+    { accessToken: string; githubUserId: number; login: string; canWrite: boolean }
+  >();
 
   const paths = async () =>
     (await db.selectFrom('pages').select('path').orderBy('path').execute()).map((row) => row.path);
@@ -107,8 +116,20 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
       githubApiBase: 'https://api.github.test',
       publicUrl: 'https://oxybook.test',
       // GitHub's pulls API, recorded: the worker opens the PR through it.
+      userTokenFor: async (userId) => linked.get(userId) ?? null,
       fetch: (async (input: string | URL | Request, init?: RequestInit) => {
-        pullRequests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+        const auth = new Headers(init?.headers).get('authorization');
+        if (String(input) === 'https://api.github.test/repos/acme/docs') {
+          const who = [...linked.values()].find((l) => auth === `Bearer ${l.accessToken}`);
+          return new Response(
+            JSON.stringify({
+              default_branch: 'main',
+              permissions: { push: who?.canWrite === true, pull: true },
+            }),
+            { status: 200 },
+          );
+        }
+        pullRequests.push({ url: String(input), auth, body: JSON.parse(String(init?.body)) });
         return new Response(
           JSON.stringify({ number: 101, html_url: 'https://github.test/acme/docs/pull/101' }),
           { status: 201 },
@@ -309,5 +330,92 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
       },
     );
     assert.ok(lines.some((line) => line.includes(`draft ${draft.id} proposed (new)`)));
+  });
+
+  async function proposeAs(
+    name: string,
+    github: { id: number; login: string; canWrite: boolean } | null,
+  ) {
+    const space = await db
+      .selectFrom('spaces')
+      .select('org_id')
+      .where('id', '=', spaceId)
+      .executeTakeFirstOrThrow();
+    const user = await db
+      .insertInto('users')
+      .values({ email: `${github?.login ?? name}@example.com`, name })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await db
+      .insertInto('org_members')
+      .values({ org_id: space.org_id, user_id: user.id, role: 'member' })
+      .execute();
+    await db
+      .insertInto('space_members')
+      .values({ org_id: space.org_id, space_id: spaceId, user_id: user.id, role: 'editor' })
+      .execute();
+    if (github) {
+      linked.set(user.id, {
+        accessToken: `ghu_${github.login}`,
+        githubUserId: github.id,
+        login: github.login,
+        canWrite: github.canWrite,
+      });
+    }
+    const draft = await openDraft(db, { spaceId, userId: user.id });
+    const base = await db
+      .selectFrom('pages')
+      .select('blob_sha')
+      .where('path', '=', 'missed.md')
+      .executeTakeFirstOrThrow();
+    await saveDraftFile(db, {
+      draftId: draft.id,
+      ifMatch: draft.version,
+      op: 'modify',
+      path: 'docs/missed.md',
+      baseBlobSha: base.blob_sha,
+      bytes: Buffer.from(`# Missed\n\nEdited by ${name}.\n`),
+    });
+    const before = pullRequests.length;
+    const id = await app.send('propose', {
+      draftId: draft.id,
+      userId: user.id,
+      title: `Edit by ${name}`,
+      signOff: false,
+    });
+    assert.ok(id);
+    await until(async () => (await app.state('propose', id)) === 'completed');
+    const after = await getDraft(db, draft.id);
+    assert.equal(after?.state, 'proposed', after?.proposeError ?? '');
+    return { draft: after, request: pullRequests.slice(before)[0] };
+  }
+
+  it('opens the PR as the user when their linked account can write, with their GitHub noreply', async () => {
+    const { draft, request } = await proposeAs('Lin', { id: 99, login: 'lin', canWrite: true });
+    assert.equal(request?.auth, 'Bearer ghu_lin', 'the pulls API was called with the user token');
+    assert.equal(
+      git(remote, 'log', '-1', '--format=%an <%ae>', draft?.branch as string).trim(),
+      'Lin <99+lin@users.noreply.github.com>',
+    );
+    assert.ok(
+      lines.some(
+        (line) =>
+          line.includes(`draft ${draft?.id} proposed (new)`) && line.includes('opened by @lin'),
+      ),
+    );
+  });
+
+  it('falls back to the App when the linked account cannot write to the repository', async () => {
+    const { draft, request } = await proposeAs('Nora', { id: 77, login: 'nora', canWrite: false });
+    assert.notEqual(request?.auth, 'Bearer ghu_nora', 'not opened with the user token');
+    assert.ok(
+      lines.some((line) => line.includes('@nora cannot write to acme/docs; the App opens the PR')),
+    );
+    assert.ok(
+      lines.some(
+        (line) =>
+          line.includes(`draft ${draft?.id} proposed (new)`) && line.includes('opened by the App'),
+      ),
+    );
   });
 });
