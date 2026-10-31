@@ -139,7 +139,12 @@ describe('commitFiles', () => {
       [
         'a workflow file',
         attempt([{ op: 'modify', path: '.github/workflows/ci.yml', bytes: one }]),
-        /outside docs/,
+        /hidden paths/,
+      ],
+      [
+        'a hidden file inside the content root',
+        attempt([{ op: 'add', path: 'docs/.env', bytes: one }]),
+        /hidden paths/,
       ],
       [
         'path traversal',
@@ -198,6 +203,17 @@ describe('commitFiles', () => {
       }).commit,
       'oxybook.yml is allowed',
     );
+    const atRoot = (repoPath: string) => () =>
+      commitFiles({
+        mirrorDir: mirror,
+        base,
+        contentRoot: '',
+        author,
+        message: 'root',
+        changes: [{ op: 'add', path: repoPath, bytes: Buffer.from('# Top\n') }],
+      });
+    assert.ok(atRoot('top.md')().commit, 'a space rooted at the repository can write pages');
+    assert.throws(atRoot('.github/workflows/new.yml'), /hidden paths/, 'but never a workflow');
   });
 });
 
