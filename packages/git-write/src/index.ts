@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export { GitCommandError, StaleLeaseError } from './git.js';
+export {
+  type CommitFilesRequest,
+  type CommitFilesResult,
+  commitFiles,
+  commitMessage,
+  type FileChange,
+  type MergeOutcome,
+  mergeFile3,
+} from './commit.js';
+export { GitCommandError, runGit, StaleLeaseError } from './git.js';
 export {
   assertAllowedPath,
   assertOxybookRef,
