@@ -8,13 +8,17 @@ You supply three things the repo does not know: the tunnel hostname, the GitHub 
 
 ## After every pull
 
-`pnpm install` installs into the project folder, so run it once, in any terminal. Then restart `pnpm dev`. Migrations and new worker code load only at start.
+`pnpm install` installs into the project folder, so run it once, in any terminal. Use `--frozen-lockfile`: a plain `pnpm install` may rewrite `pnpm-lock.yaml`, and the next `git pull` then refuses to overwrite it. Then restart `pnpm dev`. Migrations and new worker code load only at start.
 
 ```sh
-git pull && pnpm install
+git pull && pnpm install --frozen-lockfile
 # then Ctrl+C in the pnpm dev terminal, and:
 pnpm dev
 ```
+
+If `git pull` stops with "Your local changes to … pnpm-lock.yaml would be overwritten", discard that generated change with `git checkout -- pnpm-lock.yaml`, then pull again.
+
+Put `OXYBOOK_MIGRATE_ON_START=true` in `.env`, or run `pnpm db:migrate` after each pull. Without either, new migrations are not applied, and commands fail with errors such as `column "…" does not exist`.
 
 `pnpm dev`, `pnpm oxybook-admin`, and `pnpm db:migrate` read the repository's `.env` themselves, so a new terminal needs no setup. Put `DATABASE_URL=postgres://oxybook:oxybook-dev@127.0.0.1:5432/oxybook` in `.env` (it is in `.env.example`). A variable already set in the shell wins over the file.
 

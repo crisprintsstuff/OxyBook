@@ -99,6 +99,6 @@ From `docs/M0-NOTES.md`. Re-read that file if it has grown since this one.
 - `git merge-tree --write-tree` prints a tree even when it exits 1. On a delete-vs-edit conflict that tree still contains the draft file, with no conflict markers. Do not commit a tree just because an id was printed.
 - Do not normalize line endings across a whole file. Original slices must be copied. Mixed LF/CRLF is a tested fixture.
 - Compose builds `Dockerfile` for `app` and `worker`. Whether a given machine has Docker is separate from the measurement recorded in `STATUS.md`.
-- Code pulled into a running `pnpm dev` does not reload: the watchers ignore `packages/*/dist`. Restart after `git pull && pnpm install`.
+- Code pulled into a running `pnpm dev` does not reload: the watchers ignore `packages/*/dist`. Restart after `git pull && pnpm install --frozen-lockfile`.
 - Database tests share one PostgreSQL. Each file uses a throwaway schema, and files run one at a time, because Kysely's migrator scans every schema (`docs/M1-NOTES.md`).
 - M0's and M1's exits are met and recorded in `STATUS.md`. Schema v0 exists; never edit a merged migration, add a new file. The signed-commit ruleset question is measured in `docs/M0-GITHUB-SPIKE.md` on this repo, not on `oxybook-test`: an unsigned push is rejected, and the Git Database API fast-forward from an installation token was accepted. `STATUS.md` is the list of what is still unverified.

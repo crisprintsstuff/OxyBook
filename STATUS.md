@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 and M1 complete. M2 in progress: slices 1–2 of `docs/M2-PLAN.md` are done (the editor document bridge, which CI now checks over all 595 corpus and fixture files, and drafts with `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase). Slice 3 is half done: the propose job, `pull_request` webhooks, and editor/viewer enforcement on propose are in, measured locally. Sign in with GitHub and user-authored PRs (3b) remain, as does a live propose against `oxybook-test`.
+- **Milestone:** M0 and M1 complete. M2 in progress: slices 1–2 of `docs/M2-PLAN.md` are done (the editor document bridge, which CI now checks over all 595 corpus and fixture files, and drafts with `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase). Slice 3 is half done: the propose job, `pull_request` webhooks, and editor/viewer enforcement on propose are in, and a live propose → merge → site update ran on `oxybook-test`. Sign in with GitHub and user-authored PRs (3b) remain.
 - **Last update:** 2026-10-30.
 - **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -30,22 +30,17 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 - **Write path (`packages/git-write`):** `commitFiles` builds one commit from any mix of add, modify, delete, and rename, using a temporary index on the bare mirror. Its guards: content root or `oxybook.yml` only, never a hidden path (`.github/workflows` included), a size limit, and one op per path consistent with the base. It adds a DCO trailer only when asked. `mergeFile3` wraps `git merge-file`. Nothing pushes these commits yet (slice 3). The M0 `oxybook-dev propose` CLI pushes a single file to `oxybook/*` with `--force-with-lease` and opens a pull request. It opened oxybook-test#1 (hand-made App) and #2 (manifest-created App), each with a diff of exactly one file. Signed-commit ruleset behaviour is in `docs/M0-GITHUB-SPIKE.md`.
 - **Running it:** on the owner's machine, `pnpm dev` runs app and worker on the host (`PORT=3100`, `HEALTH_PORT=3101`, because Grafana holds 3000), with compose `postgres` and `caddy` (`CADDY_PORT=8180`, because qBittorrent holds 8080) and a Cloudflare tunnel `oxybook.boznetwork.com` → `localhost:3100`. Host processes read the repo `.env`. The container image (`docker compose up --build`) also starts and migrates. Steps are in `docs/LIVE-INSTALL.md`.
 - **CI:** `.github/workflows/ci.yml` starts `postgres:17` and runs lint, typecheck, test, `db:migrate`, and `test:corpus`. Database test files run one at a time (see M1-NOTES.md, sharp edge). Results are on the Actions tab.
-- **What does not exist:** Sign in with GitHub and user-authored PRs (all PRs are App-authored), an HTTP API for drafts, the editor (`apps/editor`), the conflict-resolution view. Viewers are refused at propose; other routes that will need the role check arrive with the editor. A propose against GitHub (not a local remote) has not been run. The Git Database API fallback for signed-commit rulesets is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` do not exist. The supported Node is 24; the owner's machine runs 22.23.1 with an engine warning.
+- **What does not exist:** Sign in with GitHub and user-authored PRs (all PRs are App-authored), an HTTP API for drafts, the editor (`apps/editor`), the conflict-resolution view. Viewers are refused at propose; other routes that will need the role check arrive with the editor. User-authored PRs have not been run: every PR so far is App-authored. The Git Database API fallback for signed-commit rulesets is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` do not exist. The supported Node is 24; the owner's machine runs 22.23.1 with an engine warning.
 
 ## Handoff
 
 For the next session, human or agent.
 
 - **Resume here:**
-  1. **Live propose on `oxybook-test`:** after `git pull && pnpm install` and a `pnpm dev` restart:
-     - `pnpm oxybook-admin draft save cris/test docs/test-page.md --user <your email> --file <local file>`
-     - `pnpm oxybook-admin draft show cris/test --user <your email>`
-     - `pnpm oxybook-admin draft propose cris/test --user <your email> --title "..."`
-
-     Expect a PR from `oxybook-cris[bot]` whose diff is only that file. Merging it should mark the draft `merged` and rebuild the site.
-  2. **M2 slice 3b:** Sign in with GitHub (OAuth with the App's client id and secret, already stored in `github_app`), account linking, and user-authored PRs when the user's token has write access.
+  - **M2 slice 3b:** Sign in with GitHub (OAuth with the App's client id and secret, already stored in `github_app`), account linking, and user-authored PRs when the user's token has write access.
 - **Owner's live setup:** App `oxybook-cris` (App id 5535294, installation 176737174 on `crisprintsstuff/oxybook-test`), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.boznetwork.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
-- **After every pull:** `git pull && pnpm install`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own.
+- **After every pull:** `git pull && pnpm install --frozen-lockfile`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own. New migrations apply only with `OXYBOOK_MIGRATE_ON_START=true` in `.env` or `pnpm db:migrate`.
+- **Write path from the CLI:** `pnpm oxybook-admin draft save|show|propose cris/test --user n0eskape@gmail.com …` (see the 2026-10-31 live run).
 - **Working conventions in this repo:** a branch, then a PR; CI must be green on both the push and the pull_request run before merging. A dated changelog entry goes below for anything measured; write "unverified" when it was not run.
 
 ## Milestones
@@ -101,6 +96,25 @@ In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages
 **Done when:** an end-to-end test edits one paragraph in an `.mdx` page containing JSX components, raw HTML and unusual frontmatter, and the resulting PR diff touches only that paragraph's lines; a non-GitHub user can propose a change that a GitHub user then merges, and the site updates.
 
 ## Changelog
+
+### 2026-10-31 — Live propose on `oxybook-test`: draft → PR → merge → site
+
+Run by the owner with `pnpm dev` on the host after #26 (`main` at `78f1797`), against `crisprintsstuff/oxybook-test`. Node v22.23.1.
+
+1. `pnpm oxybook-admin draft save cris/test docs/test-page.md --user n0eskape@gmail.com --file /tmp/test-page.md` printed `draft 291ddf98-ce18-4e9c-a281-a8b0ad154547 v2: modify docs/test-page.md`.
+2. `draft show` printed `v2 editing on main@b8058130b7d5` and the unified diff (3 lines out, 1 in).
+3. `draft propose … --title "Edit the test page from a draft"`. The worker logged `draft 291ddf98… proposed (new): oxybook/cris/test-page-291ddf98 at 5e99b73194c9, PR #6 opened`. The `push` webhook for the PR branch was ignored (`no space follows … @oxybook/cris/test-page-291ddf98`), and the `pull_request opened` webhook needed nothing.
+4. Checked from this session through the GitHub API:
+   - [oxybook-test#6](https://github.com/crisprintsstuff/oxybook-test/pull/6), user `oxybook-cris[bot]`, head `oxybook/cris/test-page-291ddf98`, base `main`. The files endpoint returned one entry: `docs/test-page.md`, modified, +1/−3.
+   - Commit `5e99b73194c9` has author `cris` with email `<user-id>@users.noreply.oxybook.boznetwork.com` and parent `b8058130b7d5`, the draft's base. The body lists the page and links back to `https://oxybook.boznetwork.com`.
+5. The owner merged #6 (`d2225dc83cf3`, 04:51:38Z). The worker synced and built `d2225dc83cf3`: 10 pages, 9 indexed, 3 warnings. The warnings are exactly the planted `configure.mdx` expression, unknown component, and broken link.
+   - `main:docs/test-page.md` now reads `Edited through an OxyBook draft.`
+   - `draft show` then printed `no open draft`.
+   - The `pull_request` closed/merged log line and the published page's text were not captured.
+
+Friction on the way, now in the docs:
+- After a plain `pnpm install` had rewritten it locally, `git pull` refused to overwrite `pnpm-lock.yaml`. LIVE-INSTALL.md now says `pnpm install --frozen-lockfile`.
+- `draft save` failed with `column "pushed_sha" does not exist` until `pnpm db:migrate`. The owner's `.env` lacked `OXYBOOK_MIGRATE_ON_START`, so `pnpm dev` started without migrating. `.env.example` now sets it.
 
 ### 2026-10-31 — M2 slice 3a: propose job, pull_request webhooks, editor/viewer on propose
 
