@@ -147,3 +147,33 @@ export async function findRenames(
   }
   return renames;
 }
+
+/**
+ * Blob reads for draft rebases and diff previews: by id, or by path at a commit. Paths
+ * resolve against trees already in the mirror; missing blobs are fetched on demand.
+ */
+export function mirrorBlobSource(mirrorDir: string, token?: string) {
+  return {
+    async blob(sha: string): Promise<Buffer> {
+      return git(mirrorDir, ['cat-file', 'blob', sha], { env: authEnv(token) });
+    },
+    async at(commit: string, repoPath: string): Promise<{ sha: string; bytes: Buffer } | null> {
+      let sha: string;
+      try {
+        sha = (await git(mirrorDir, ['rev-parse', '--verify', '--quiet', `${commit}:${repoPath}`]))
+          .toString()
+          .trim();
+      } catch {
+        return null;
+      }
+      const type = (await git(mirrorDir, ['cat-file', '-t', sha], { env: authEnv(token) }))
+        .toString()
+        .trim();
+      if (type !== 'blob') return null;
+      return {
+        sha,
+        bytes: await git(mirrorDir, ['cat-file', 'blob', sha], { env: authEnv(token) }),
+      };
+    },
+  };
+}

@@ -5,6 +5,7 @@ export {
   fetchRef,
   findRenames,
   listFiles,
+  mirrorBlobSource,
   mirrorPath,
   type Rename,
   readBlobs,
@@ -27,6 +28,7 @@ export {
   type ReconcileOutcome,
   runSpaceSync,
   type SyncEnvironment,
+  spaceBlobSource,
   storedAppTokens,
 } from './runner.js';
 export { type SyncResult, type SyncTarget, syncSpace } from './sync.js';

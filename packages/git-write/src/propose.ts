@@ -71,7 +71,13 @@ export function assertAllowedPath(repoPath: string, contentRoot: string): string
     throw new GuardError(`refusing path ${repoPath}`);
   }
   if (normalized === 'oxybook.yml') return normalized;
+  // Hidden paths (.github/workflows, .git, .gitattributes) are never pages. Refusing them
+  // matters most when the content root is the whole repository.
+  if (normalized.split('/').some((segment) => segment.startsWith('.'))) {
+    throw new GuardError(`refusing path ${repoPath}; hidden paths are never written`);
+  }
   const root = contentRoot.replace(/\\/g, '/').replace(/^\/+|\/+$/g, '');
+  if (root === '') return normalized;
   if (normalized === root || normalized.startsWith(`${root}/`)) return normalized;
   throw new GuardError(
     `refusing path ${repoPath}; it is outside ${contentRoot} and is not oxybook.yml`,

@@ -57,6 +57,9 @@ importers:
       '@oxybook/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@oxybook/drafts':
+        specifier: workspace:*
+        version: link:../../packages/drafts
       '@oxybook/jobs':
         specifier: workspace:*
         version: link:../../packages/jobs
@@ -144,6 +147,28 @@ importers:
       fast-check:
         specifier: 4.10.2
         version: 4.10.2
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
+  packages/drafts:
+    dependencies:
+      '@oxybook/db':
+        specifier: workspace:*
+        version: link:../db
+      '@oxybook/git-write':
+        specifier: workspace:*
+        version: link:../git-write
+      diff:
+        specifier: 9.0.0
+        version: 9.0.0
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
       tsx:
         specifier: 4.23.15
         version: 4.23.15
@@ -873,6 +898,10 @@ packages:
 
   devlop@1.1.0:
     resolution: {integrity: sha512-RWmIqhcFf1lRYBvNmr7qTNuyCt/7/ns2jbpp1+PalgE/rDQcBT0fioSMUpJ93irlUhC5hrg4cYqe6U+0ImW0rA==}
+
+  diff@9.0.0:
+    resolution: {integrity: sha512-svtcdpS8CgJyqAjEQIXdb3OjhFVVYjzGAPO8WGCmRbrml64SPw/jJD4GoE98aR7r25A0XcgrK3F02yw9R/vhQw==}
+    engines: {node: '>=0.3.1'}
 
   esbuild@0.28.2:
     resolution: {integrity: sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==}
@@ -1673,6 +1702,8 @@ snapshots:
   devlop@1.1.0:
     dependencies:
       dequal: 2.0.3
+
+  diff@9.0.0: {}
 
   esbuild@0.28.2:
     optionalDependencies:

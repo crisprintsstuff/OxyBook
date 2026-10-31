@@ -4,12 +4,14 @@ import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, type Database, type Kysely } from '@oxybook/db';
+import { rebaseDrafts } from '@oxybook/drafts';
 import { buildKey, type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
 import { type BuildEnvironment, runSpaceBuild } from '@oxybook/renderer';
 import {
   findStaleSpaces,
   runSpaceSync,
   type SyncEnvironment,
+  spaceBlobSource,
   storedAppTokens,
 } from '@oxybook/sync';
 
@@ -82,6 +84,36 @@ export interface JobWorkerOptions {
 }
 
 /**
+ * The base moved: bring open drafts forward (ARCHITECTURE §4.5). A draft whose user saved
+ * while it was being merged reports retry; take a fresh look a few times, then leave it
+ * for the next sync rather than fail the sync job.
+ */
+async function rebaseOpenDrafts(
+  env: SyncEnvironment,
+  spaceId: string,
+  ref: string,
+  head: string,
+  log: (line: string) => void,
+): Promise<void> {
+  const source = await spaceBlobSource(env, spaceId);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const outcomes = await rebaseDrafts(env.db, { spaceId, ref, head, source });
+    for (const outcome of outcomes) {
+      if (outcome.result === 'retry') continue;
+      const detail =
+        outcome.result === 'conflicted'
+          ? outcome.conflicts.map((c) => `${c.path} (${c.why})`).join(', ')
+          : `${outcome.merged.length} merged, ${outcome.dropped.length} already upstream`;
+      log(`draft ${outcome.draftId} ${outcome.result} onto ${head.slice(0, 12)}: ${detail}`);
+    }
+    if (!outcomes.some((outcome) => outcome.result === 'retry')) return;
+  }
+  log(
+    `drafts on space ${spaceId} ${ref}: a draft kept changing during rebase; the next sync retries`,
+  );
+}
+
+/**
  * Registers a handler per queue. Without DATABASE_URL the worker only serves /healthz,
  * which is what compose's health check and the M0 tests need.
  */
@@ -129,7 +161,8 @@ export async function startJobWorker(
         `job sync ${job.id} space ${spaceId} ref ${ref} (${reason}${job.data.deliveryId ? ` ${job.data.deliveryId}` : ''})`,
       );
       try {
-        await runSpaceSync(env, spaceId, ref);
+        const synced = await runSpaceSync(env, spaceId, ref);
+        if (synced.from !== synced.to) await rebaseOpenDrafts(env, spaceId, ref, synced.to, log);
         if (options.buildAfterSync !== false) {
           const buildJobId = await jobs.send(
             'build',
