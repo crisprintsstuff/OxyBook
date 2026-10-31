@@ -11,9 +11,6 @@
       "import": "./dist/index.js"
     }
   },
-  "bin": {
-    "oxybook-dev": "./dist/cli.js"
-  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "pnpm --filter @oxybook/github build && tsc -p tsconfig.json --noEmit",
