@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, type Database, type Kysely } from '@oxybook/db';
 import { getDraft, ProposeRetry, proposeDraft, rebaseDrafts } from '@oxybook/drafts';
-import { openPullRequest } from '@oxybook/github';
+import { checkUserRepoAccess, githubNoreplyEmail, openPullRequest } from '@oxybook/github';
 import { buildKey, type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
 import { type BuildEnvironment, runSpaceBuild } from '@oxybook/renderer';
 import {
@@ -16,6 +16,8 @@ import {
   spaceBlobSource,
   spaceGit,
   storedAppTokens,
+  storedUserTokens,
+  type UserGithub,
 } from '@oxybook/sync';
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
@@ -89,6 +91,8 @@ export interface JobWorkerOptions {
   fetch?: typeof fetch;
   /** Public origin for PR link-backs and the noreply commit email domain. */
   publicUrl?: string;
+  /** Linked users' GitHub tokens. Defaults to the sealed ones in github_accounts. */
+  userTokenFor?: (userId: string) => Promise<UserGithub | null>;
 }
 
 /** Failures that are the user's to fix: shown on the draft, not retried. */
@@ -210,6 +214,12 @@ export async function startJobWorker(
     },
     polling,
   );
+  const userTokenFor =
+    options.userTokenFor ??
+    storedUserTokens(db, process.env.OXYBOOK_SECRET_KEY, {
+      ...(options.fetch ? { fetch: options.fetch } : {}),
+      log,
+    });
   const publicUrl =
     options.publicUrl ?? process.env.OXYBOOK_PUBLIC_URL ?? 'http://app.localhost:8080';
   const noreplyHost = new URL(publicUrl).hostname;
@@ -225,6 +235,35 @@ export async function startJobWorker(
       }
       try {
         const git = await spaceGit(env, draft.spaceId);
+        const linked = await userTokenFor(userId);
+        // A PR opened with the user's token is authored by them (ARCHITECTURE §4.1), but only
+        // when they can write to the repository. Otherwise, and on any error, the App opens it.
+        let userToken: string | null = null;
+        if (linked) {
+          try {
+            const access = await checkUserRepoAccess({
+              owner: git.owner,
+              repo: git.repo,
+              userToken: linked.accessToken,
+              ...(options.fetch ? { fetch: options.fetch } : {}),
+              ...(options.githubApiBase ? { apiBase: options.githubApiBase } : {}),
+            });
+            if (access.allowed) userToken = linked.accessToken;
+            else
+              log(
+                `draft ${draftId}: @${linked.login} cannot write to ${git.owner}/${git.repo}; the App opens the PR`,
+              );
+          } catch (error) {
+            log(
+              `draft ${draftId}: access check for @${linked.login} failed (${error instanceof Error ? error.message : String(error)}); the App opens the PR`,
+            );
+          }
+        }
+        const githubCall = {
+          ...(options.fetch ? { fetch: options.fetch } : {}),
+          ...(options.githubApiBase ? { apiBase: options.githubApiBase } : {}),
+        };
+        let openedBy = 'the App';
         const outcome = await proposeDraft(
           {
             db,
@@ -233,22 +272,38 @@ export async function startJobWorker(
             remoteHead: git.remoteHead,
             push: git.push,
             blobs: git.blobs,
-            openPullRequest: (pr) =>
-              openPullRequest(
+            openPullRequest: async (pr) => {
+              if (userToken && linked) {
+                try {
+                  const opened = await openPullRequest(
+                    { owner: git.owner, repo: git.repo, ...pr, token: userToken },
+                    githubCall,
+                  );
+                  openedBy = `@${linked.login}`;
+                  return opened;
+                } catch (error) {
+                  log(
+                    `draft ${draftId}: opening the PR as @${linked.login} failed (${error instanceof Error ? error.message : String(error)}); the App opens it`,
+                  );
+                }
+              }
+              return openPullRequest(
                 { owner: git.owner, repo: git.repo, ...pr, token: git.token ?? '' },
-                {
-                  ...(options.fetch ? { fetch: options.fetch } : {}),
-                  ...(options.githubApiBase ? { apiBase: options.githubApiBase } : {}),
-                },
-              ),
+                githubCall,
+              );
+            },
             linkBack: publicUrl,
-            commitEmail: (id) => `${id}@users.noreply.${noreplyHost}`,
+            // GitHub's noreply links commits to a linked profile; otherwise a per-instance one.
+            commitEmail: (id) =>
+              linked
+                ? githubNoreplyEmail({ id: linked.githubUserId, login: linked.login })
+                : `${id}@users.noreply.${noreplyHost}`,
           },
           { draftId, userId, title, signOff },
         );
         if (outcome.kind === 'proposed') {
           log(
-            `draft ${draftId} proposed (${outcome.mode}): ${outcome.branch} at ${outcome.commit.slice(0, 12)}, PR #${outcome.prNumber}${outcome.openedPullRequest ? ' opened' : ''} ${outcome.prUrl}`,
+            `draft ${draftId} proposed (${outcome.mode}): ${outcome.branch} at ${outcome.commit.slice(0, 12)}, PR #${outcome.prNumber}${outcome.openedPullRequest ? ` opened by ${openedBy}` : ''} ${outcome.prUrl}`,
           );
         } else if (outcome.kind === 'unchanged') {
           log(`draft ${draftId}: nothing new since the last push to ${outcome.branch}`);

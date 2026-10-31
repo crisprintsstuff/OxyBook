@@ -142,15 +142,6 @@ describe('GitHub manifest routes', () => {
     });
   });
 
-  it('answers the OAuth callback path with 501 instead of 404', async () => {
-    const routes = createGithubRoutes({ manifest: manifestInput, owner: { kind: 'user' } });
-    await withServer(routes, async (base) => {
-      const response = await fetch(`${base}/api/github/oauth/callback?code=x`);
-      assert.equal(response.status, 501);
-      assert.match(await response.text(), /not implemented/);
-    });
-  });
-
   it('rejects a webhook whose signature does not match the raw body', async () => {
     const lines: string[] = [];
     const routes = createGithubRoutes({

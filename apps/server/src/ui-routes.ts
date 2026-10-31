@@ -4,6 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import {
   type Database,
   deriveSecretsKey,
+  githubLoginOf,
   type Kysely,
   loadAppCredentials,
   type SpaceRole,
@@ -38,6 +39,7 @@ import {
   signUpUser,
   verifyCsrfToken,
 } from './auth.js';
+import { handleGithubOAuth } from './github-oauth.js';
 
 export interface UiRouteOptions {
   db: Kysely<Database>;
@@ -364,6 +366,8 @@ function renderSignupPage(error?: string): string {
 }
 
 function renderLoginPage(error?: string): string {
+  const githubButton = `<p style="margin:1rem 0 0"><a class="btn secondary" style="display:block;text-align:center" href="/auth/github">Sign in with GitHub</a></p>
+      <p class="muted" style="margin:0.5rem 0 0;font-size:0.85rem">Works once you have linked GitHub from your dashboard.</p>`;
   const errHtml = error ? `<div class="alert-error">${escapeHtml(error)}</div>` : '';
   return renderShell({
     title: 'Sign in',
@@ -377,6 +381,7 @@ function renderLoginPage(error?: string): string {
         <input id="password" name="password" type="password" required autocomplete="current-password">
         <button type="submit" style="width:100%">Sign in</button>
       </form>
+      ${githubButton}
       <p class="muted" style="margin-bottom:0;margin-top:1rem">Need an account? <a href="/signup">Create one</a>.</p>
     </div>`,
   });
@@ -403,6 +408,8 @@ function renderDashboardPage(input: {
   sitesDomain: string;
   sitesPort?: string | number;
   requireUserToken?: boolean;
+  /** The user's linked GitHub login, or null. */
+  githubLogin?: string | null;
   error?: string;
   notice?: string;
 }): string {
@@ -419,6 +426,15 @@ function renderDashboardPage(input: {
        <a class="btn secondary" href="${escapeHtml(installUrl ?? '#')}" target="_blank" rel="noopener noreferrer">Configure / Install on GitHub</a>`
     : `<p style="margin:0 0 0.75rem">No GitHub App is configured for this instance yet. Create one with the GitHub App Manifest flow so permissions and webhooks are configured automatically.</p>
        <a class="btn" href="/setup/github">Create GitHub App</a>`;
+
+  const githubAccountSection = input.githubLogin
+    ? `<p style="margin:0 0 0.75rem">Linked as <strong>@${escapeHtml(input.githubLogin)}</strong>. Pull requests you propose are opened as you when you can write to the repository; otherwise by the App.</p>
+       <form method="post" action="/auth/github/unlink" style="margin:0">
+         <input type="hidden" name="_csrf" value="${escapeHtml(input.csrfToken)}">
+         <button type="submit" class="secondary">Unlink GitHub</button>
+       </form>`
+    : `<p style="margin:0 0 0.75rem">Link your GitHub account to sign in with GitHub and to have the pull requests you propose opened as you. Without it, they are opened by the App.</p>
+       <a class="btn" href="/auth/github?mode=link">Link GitHub account</a>`;
 
   const orgRows =
     input.orgs.length > 0
@@ -538,6 +554,10 @@ function renderDashboardPage(input: {
         <section class="card">
           <h2>1. GitHub App</h2>
           ${appSection}
+        </section>
+        <section class="card">
+          <h2>Your GitHub account</h2>
+          ${githubAccountSection}
         </section>
         <section class="card">
           <h2>2. Organisations</h2>
@@ -766,6 +786,31 @@ export function createUiRoutes(options: UiRouteOptions): {
       const method = request.method ?? 'GET';
       const isJson = wantsJson(request, pathname);
 
+      if (
+        await handleGithubOAuth(
+          {
+            db,
+            secretKey: options.secretKey,
+            publicUrl: options.publicUrl ?? 'http://app.localhost:8080',
+            githubHost,
+            ...(options.apiBase ? { apiBase: options.apiBase } : {}),
+            ...(options.fetch ? { fetch: options.fetch } : {}),
+            secureCookies: secureCookie,
+            ...(options.now ? { now: options.now } : {}),
+            currentApp,
+            currentSession,
+            checkCsrf,
+            parseBody: parseBodyParams,
+          },
+          request,
+          response,
+          url,
+          rawBody,
+        )
+      ) {
+        return true;
+      }
+
       // 1. Auth: GET /signup & GET /login
       if (method === 'GET' && pathname === '/signup') {
         const session = await currentSession(request);
@@ -923,6 +968,7 @@ export function createUiRoutes(options: UiRouteOptions): {
             renderDashboardPage({
               user: session.user,
               csrfToken: session.csrfToken,
+              githubLogin: await githubLoginOf(db, session.user.id),
               app,
               githubHost,
               installedRepos,

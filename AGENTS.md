@@ -27,12 +27,12 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3a (propose job, `pull_request` webhooks, editor/viewer on propose) are done; next is slice 3b (Sign in with GitHub, user-authored PRs) and a live propose on `oxybook-test`. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs) are done; next is slice 4, the editor. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
 ```
-apps/server            AGPL   HTTP process. /healthz, migrations on start, accounts/sessions, org/space UI, GitHub manifest flow, webhook verify.
+apps/server            AGPL   HTTP process. /healthz, migrations on start, accounts/sessions, Sign in with GitHub, org/space UI, GitHub manifest flow, webhooks.
 apps/worker            AGPL   worker process. /healthz; works jobs from the queue when DATABASE_URL is set.
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLIs (oxybook-roundtrip, oxybook-check).
 packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.

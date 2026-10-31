@@ -33,5 +33,7 @@ export {
   spaceBlobSource,
   spaceGit,
   storedAppTokens,
+  storedUserTokens,
+  type UserGithub,
 } from './runner.js';
 export { type SyncResult, type SyncTarget, syncSpace } from './sync.js';

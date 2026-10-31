@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { type Database, deriveSecretsKey, type Kysely, loadAppCredentials } from '@oxybook/db';
-import { InstallationTokenCache, signAppJwt } from '@oxybook/github';
+import {
+  type Database,
+  deriveSecretsKey,
+  type Kysely,
+  loadAppCredentials,
+  loadGithubAccount,
+  updateGithubTokens,
+} from '@oxybook/db';
+import { InstallationTokenCache, refreshUserToken, signAppJwt } from '@oxybook/github';
 import { fetchRef, mirrorBlobSource, mirrorPath, pushBranch, remoteHead } from './mirror.js';
 import { type SyncResult, syncSpace } from './sync.js';
 
@@ -37,6 +44,78 @@ export function storedAppTokens(
       });
     }
     return cache.get(installationId);
+  };
+}
+
+export interface UserGithub {
+  accessToken: string;
+  githubUserId: number;
+  login: string;
+}
+
+/**
+ * A linked user's GitHub token, refreshed when it is within five minutes of expiry
+ * (GitHub App user tokens last eight hours). Null when the user has no linked account,
+ * or its refresh token is gone or rejected: the caller falls back to the App.
+ */
+export function storedUserTokens(
+  db: Kysely<Database>,
+  secretKey: string | undefined,
+  options: {
+    fetch?: typeof fetch;
+    githubHost?: string;
+    now?: () => number;
+    log?: (line: string) => void;
+  } = {},
+): (userId: string) => Promise<UserGithub | null> {
+  return async (userId) => {
+    if (!secretKey) return null;
+    const key = deriveSecretsKey(secretKey);
+    const account = await loadGithubAccount(db, key, userId);
+    if (!account) return null;
+    const now = (options.now ?? Date.now)();
+    const fresh = !account.accessExpiresAt || account.accessExpiresAt.getTime() - now > 5 * 60_000;
+    if (fresh)
+      return {
+        accessToken: account.accessToken,
+        githubUserId: account.githubUserId,
+        login: account.login,
+      };
+    const refreshable =
+      account.refreshToken &&
+      (!account.refreshExpiresAt || account.refreshExpiresAt.getTime() > now);
+    const app = refreshable ? await loadAppCredentials(db, key) : null;
+    if (!refreshable || !app) {
+      options.log?.(
+        `github token for @${account.login} expired and cannot be refreshed; using the App`,
+      );
+      return null;
+    }
+    try {
+      const token = await refreshUserToken(
+        {
+          clientId: app.clientId,
+          clientSecret: app.clientSecret,
+          refreshToken: account.refreshToken as string,
+        },
+        {
+          ...(options.fetch ? { fetch: options.fetch } : {}),
+          ...(options.githubHost ? { githubHost: options.githubHost } : {}),
+          ...(options.now ? { now: options.now } : {}),
+        },
+      );
+      await updateGithubTokens(db, key, userId, token);
+      return {
+        accessToken: token.accessToken,
+        githubUserId: account.githubUserId,
+        login: account.login,
+      };
+    } catch (error) {
+      options.log?.(
+        `github token refresh for @${account.login} failed (${error instanceof Error ? error.message : String(error)}); using the App`,
+      );
+      return null;
+    }
   };
 }
 
