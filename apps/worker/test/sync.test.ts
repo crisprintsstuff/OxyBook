@@ -52,6 +52,7 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
   let app: JobQueue;
   let stopWorker: () => Promise<void>;
   const lines: string[] = [];
+  const pullRequests: { url: string; body: { head: string; base: string; title: string } }[] = [];
 
   const paths = async () =>
     (await db.selectFrom('pages').select('path').orderBy('path').execute()).map((row) => row.path);
@@ -103,6 +104,16 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
       mirrorsDir: path.join(tmp, 'mirrors'),
       sitesDir: path.join(tmp, 'sites'),
       reconcileCron: 'off',
+      githubApiBase: 'https://api.github.test',
+      publicUrl: 'https://oxybook.test',
+      // GitHub's pulls API, recorded: the worker opens the PR through it.
+      fetch: (async (input: string | URL | Request, init?: RequestInit) => {
+        pullRequests.push({ url: String(input), body: JSON.parse(String(init?.body)) });
+        return new Response(
+          JSON.stringify({ number: 101, html_url: 'https://github.test/acme/docs/pull/101' }),
+          { status: 201 },
+        );
+      }) as typeof fetch,
     });
     stopWorker = worker.stop;
     app = await startJobs(url as string, { schema: bossSchema, log: () => {} });
@@ -224,5 +235,79 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
     assert.ok(
       lines.some((line) => line.includes(`draft ${draft.id} rebased onto ${head.slice(0, 12)}`)),
     );
+  });
+
+  it('a propose job pushes an oxybook/* branch and opens the pull request', async () => {
+    const space = await db
+      .selectFrom('spaces')
+      .select('org_id')
+      .where('id', '=', spaceId)
+      .executeTakeFirstOrThrow();
+    const user = await db
+      .insertInto('users')
+      .values({ email: 'editor@example.com', name: 'Eda Editor' })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    await db
+      .insertInto('org_members')
+      .values({ org_id: space.org_id, user_id: user.id, role: 'member' })
+      .execute();
+    await db
+      .insertInto('space_members')
+      .values({ org_id: space.org_id, space_id: spaceId, user_id: user.id, role: 'editor' })
+      .execute();
+    const draft = await openDraft(db, { spaceId, userId: user.id });
+    const base = await db
+      .selectFrom('pages')
+      .select('blob_sha')
+      .where('path', '=', 'index.md')
+      .executeTakeFirstOrThrow();
+    await saveDraftFile(db, {
+      draftId: draft.id,
+      ifMatch: draft.version,
+      op: 'modify',
+      path: 'docs/index.md',
+      baseBlobSha: base.blob_sha,
+      bytes: Buffer.from('# Home\n\nProposed from OxyBook.\n'),
+    });
+
+    const id = await app.send('propose', {
+      draftId: draft.id,
+      userId: user.id,
+      title: 'Say hello',
+      signOff: false,
+    });
+    assert.ok(id);
+    await until(async () => (await app.state('propose', id)) === 'completed');
+
+    const after = await getDraft(db, draft.id);
+    assert.equal(after?.state, 'proposed', after?.proposeError ?? '');
+    assert.equal(after?.prUrl, 'https://github.test/acme/docs/pull/101');
+    const branch = after?.branch as string;
+    assert.match(branch, /^oxybook\/eda-editor\/index-[0-9a-f]{8}$/);
+    assert.equal(git(remote, 'diff', '--name-only', 'main', branch).trim(), 'docs/index.md');
+    assert.equal(
+      git(remote, 'show', `${branch}:docs/index.md`),
+      '# Home\n\nProposed from OxyBook.\n',
+    );
+    assert.match(
+      git(remote, 'log', '-1', '--format=%ae', branch).trim(),
+      /@users\.noreply\.oxybook\.test$/,
+    );
+    assert.deepEqual(
+      {
+        url: pullRequests[0]?.url,
+        head: pullRequests[0]?.body.head,
+        base: pullRequests[0]?.body.base,
+        title: pullRequests[0]?.body.title,
+      },
+      {
+        url: 'https://api.github.test/repos/acme/docs/pulls',
+        head: branch,
+        base: 'main',
+        title: 'Say hello',
+      },
+    );
+    assert.ok(lines.some((line) => line.includes(`draft ${draft.id} proposed (new)`)));
   });
 });

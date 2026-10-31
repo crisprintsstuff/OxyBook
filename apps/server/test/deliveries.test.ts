@@ -111,4 +111,60 @@ describe('webhook deliveries', { skip: url ? false : 'DATABASE_URL is not set' }
     );
     assert.equal(sent.length, 1);
   });
+
+  it('moves the draft whose PR was merged, closed, or reopened', async () => {
+    const user = await db
+      .insertInto('users')
+      .values({ email: 'w@example.com', name: 'W' })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const space = await db
+      .selectFrom('spaces')
+      .select('org_id')
+      .where('id', '=', spaceId)
+      .executeTakeFirstOrThrow();
+    const draft = await db
+      .insertInto('drafts')
+      .values({
+        org_id: space.org_id,
+        space_id: spaceId,
+        user_id: user.id,
+        base_ref: 'main',
+        base_sha: 'a'.repeat(40),
+        branch: 'oxybook/w/guide-12345678',
+        pr_number: 7,
+        state: 'proposed',
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    const pr = (
+      action: string,
+      merged: boolean,
+      delivery: string,
+      ref = 'oxybook/w/guide-12345678',
+    ) =>
+      handleDelivery(db, jobs, {
+        event: 'pull_request',
+        delivery,
+        payload: {
+          action,
+          pull_request: { number: 7, merged, head: { ref } },
+          repository: { name: 'OxyBook-Test', owner: { login: 'CrisPrintsStuff' } },
+        },
+      });
+    assert.deepEqual(await pr('closed', false, 'p1'), {
+      kind: 'drafts',
+      event: 'closed',
+      drafts: [{ draftId: draft.id, state: 'closed' }],
+    });
+    assert.equal((await pr('reopened', false, 'p2')).kind, 'drafts');
+    assert.equal((await pr('synchronize', false, 'p3')).kind, 'ignored');
+    assert.equal((await pr('closed', true, 'p4', 'feature/not-ours')).kind, 'ignored');
+    assert.deepEqual(await pr('closed', true, 'p5'), {
+      kind: 'drafts',
+      event: 'merged',
+      drafts: [{ draftId: draft.id, state: 'merged' }],
+    });
+    assert.deepEqual(await pr('closed', true, 'p5'), { kind: 'duplicate' });
+  });
 });

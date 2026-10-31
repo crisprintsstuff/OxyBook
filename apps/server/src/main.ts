@@ -224,6 +224,12 @@ export async function deliveryHandlerFromEnv(
       log(`webhook ${delivery.delivery} seen before; ignored`);
     } else if (outcome.kind === 'ignored') {
       log(`webhook ${delivery.delivery} ${delivery.event}: nothing to do (${outcome.reason})`);
+    } else if (outcome.kind === 'drafts') {
+      for (const draft of outcome.drafts) {
+        log(
+          `webhook ${delivery.delivery} pull_request: draft ${draft.draftId} ${outcome.event}, now ${draft.state}`,
+        );
+      }
     } else {
       for (const queued of outcome.spaces) {
         log(

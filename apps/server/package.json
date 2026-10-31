@@ -7,15 +7,16 @@
   "description": "OxyBook API process. M0 exposes /healthz, the GitHub manifest callback, and webhook verification, and runs database migrations on start when asked.",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "typecheck": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/theme-default --filter @oxybook/renderer build && tsc -p tsconfig.json --noEmit",
-    "test": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/theme-default --filter @oxybook/renderer build && node --import tsx --test --test-concurrency=1 test/*.test.ts",
-    "dev": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/theme-default --filter @oxybook/renderer build && tsx watch src/main.ts",
+    "typecheck": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/git-write --filter @oxybook/drafts --filter @oxybook/theme-default --filter @oxybook/renderer build && tsc -p tsconfig.json --noEmit",
+    "test": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/git-write --filter @oxybook/drafts --filter @oxybook/theme-default --filter @oxybook/renderer build && node --import tsx --test --test-concurrency=1 test/*.test.ts",
+    "dev": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/git-write --filter @oxybook/drafts --filter @oxybook/theme-default --filter @oxybook/renderer build && tsx watch src/main.ts",
     "dev:watch": "tsx watch --exclude '../../packages/*/dist/**' --env-file-if-exists=../../.env src/main.ts",
     "start": "node dist/main.js"
   },
   "dependencies": {
     "@node-rs/argon2": "2.2.2",
     "@oxybook/db": "workspace:*",
+    "@oxybook/drafts": "workspace:*",
     "@oxybook/github": "workspace:*",
     "@oxybook/jobs": "workspace:*",
     "@oxybook/renderer": "workspace:*",

@@ -4,14 +4,17 @@ import { createServer, type Server } from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createDb, type Database, type Kysely } from '@oxybook/db';
-import { rebaseDrafts } from '@oxybook/drafts';
+import { getDraft, ProposeRetry, proposeDraft, rebaseDrafts } from '@oxybook/drafts';
+import { openPullRequest } from '@oxybook/github';
 import { buildKey, type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
 import { type BuildEnvironment, runSpaceBuild } from '@oxybook/renderer';
 import {
   findStaleSpaces,
+  LeaseRejected,
   runSpaceSync,
   type SyncEnvironment,
   spaceBlobSource,
+  spaceGit,
   storedAppTokens,
 } from '@oxybook/sync';
 
@@ -81,6 +84,19 @@ export interface JobWorkerOptions {
   reconcileCron?: string;
   /** Automatically queue a build after a sync job completes (default true). */
   buildAfterSync?: boolean;
+  /** GitHub REST API base and fetch, for tests. Defaults: api.github.com, global fetch. */
+  githubApiBase?: string;
+  fetch?: typeof fetch;
+  /** Public origin for PR link-backs and the noreply commit email domain. */
+  publicUrl?: string;
+}
+
+/** Failures that are the user's to fix: shown on the draft, not retried. */
+function isUserError(error: unknown): boolean {
+  const status = (error as { status?: unknown })?.status;
+  return (
+    status === 400 || status === 403 || status === 409 || (error as Error)?.name === 'GuardError'
+  );
 }
 
 /**
@@ -189,6 +205,69 @@ export async function startJobWorker(
         log(
           `job build ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,
         );
+        throw error;
+      }
+    },
+    polling,
+  );
+  const publicUrl =
+    options.publicUrl ?? process.env.OXYBOOK_PUBLIC_URL ?? 'http://app.localhost:8080';
+  const noreplyHost = new URL(publicUrl).hostname;
+  await jobs.work(
+    'propose',
+    async (job) => {
+      const { draftId, userId, title, signOff } = job.data;
+      log(`job propose ${job.id} draft ${draftId}`);
+      const draft = await getDraft(db, draftId);
+      if (!draft) {
+        log(`job propose ${job.id}: draft ${draftId} no longer exists`);
+        return;
+      }
+      try {
+        const git = await spaceGit(env, draft.spaceId);
+        const outcome = await proposeDraft(
+          {
+            db,
+            mirrorDir: git.mirrorDir,
+            fetch: git.fetch,
+            remoteHead: git.remoteHead,
+            push: git.push,
+            blobs: git.blobs,
+            openPullRequest: (pr) =>
+              openPullRequest(
+                { owner: git.owner, repo: git.repo, ...pr, token: git.token ?? '' },
+                {
+                  ...(options.fetch ? { fetch: options.fetch } : {}),
+                  ...(options.githubApiBase ? { apiBase: options.githubApiBase } : {}),
+                },
+              ),
+            linkBack: publicUrl,
+            commitEmail: (id) => `${id}@users.noreply.${noreplyHost}`,
+          },
+          { draftId, userId, title, signOff },
+        );
+        if (outcome.kind === 'proposed') {
+          log(
+            `draft ${draftId} proposed (${outcome.mode}): ${outcome.branch} at ${outcome.commit.slice(0, 12)}, PR #${outcome.prNumber}${outcome.openedPullRequest ? ' opened' : ''} ${outcome.prUrl}`,
+          );
+        } else if (outcome.kind === 'unchanged') {
+          log(`draft ${draftId}: nothing new since the last push to ${outcome.branch}`);
+        } else {
+          log(`draft ${draftId} conflicted: ${outcome.reason} (${outcome.paths.join(', ')})`);
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (error instanceof ProposeRetry || error instanceof LeaseRejected) {
+          log(`job propose ${job.id}: ${message}; retrying`);
+          throw error;
+        }
+        await db
+          .updateTable('drafts')
+          .set({ propose_error: message })
+          .where('id', '=', draftId)
+          .execute();
+        log(`job propose ${job.id} failed: ${message}`);
+        if (isUserError(error)) return;
         throw error;
       }
     },
