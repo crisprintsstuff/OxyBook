@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
+import { openEditorDocument, serializeEditorState } from '../src/editor-doc.js';
 import { checkIdentity } from '../src/identity.js';
 import { listMarkdownFiles } from '../src/roundtrip.js';
 
@@ -153,5 +154,54 @@ describe('corpus identity', () => {
       const counts = summary.get(repo.name);
       assert.ok(counts && counts.pass > 0, `${repo.name} had no passing files`);
     }
+  });
+});
+
+/** Every file the identity check covers, by corpus name. Fetches nothing already cached. */
+function corpusFiles(): { repo: string; root: string; files: string[] }[] {
+  const fixtureRoot = path.join(repoRoot, 'corpus/fixtures');
+  const sets = [{ repo: 'fixtures', root: fixtureRoot, files: listMarkdownFiles(fixtureRoot) }];
+  for (const repo of manifest.repos) {
+    const dest = ensureRepo(repo);
+    const files = repo.paths.flatMap((docPath) => {
+      const full = path.join(dest, docPath);
+      return existsSync(full) ? listMarkdownFiles(full) : [];
+    });
+    sets.push({ repo: repo.name, root: dest, files });
+  }
+  return sets;
+}
+
+// M2 slice 1's exit check, kept in CI: the editor must open every parseable file and
+// save it back unchanged, and route the rest to source-only mode (ARCHITECTURE §3.4).
+describe('corpus through the editor bridge', () => {
+  it('opens and re-serializes every file byte-for-byte', { timeout: 600_000 }, () => {
+    const failures: string[] = [];
+    let visual = 0;
+    let sourceOnly = 0;
+    for (const set of corpusFiles()) {
+      for (const file of set.files) {
+        const bytes = readFileSync(file);
+        const source = bytes.toString('utf8');
+        // Invalid UTF-8 is unparseable by design; the identity check already counts it.
+        if (!bytes.equals(Buffer.from(source, 'utf8'))) continue;
+        const name = `${set.repo}/${path.relative(set.root, file)}`;
+        const parseable = checkIdentity(source, { filename: file }).status === 'pass';
+        const opened = openEditorDocument(source, { filename: file });
+        if (opened.mode === 'source-only') {
+          sourceOnly++;
+          if (parseable)
+            failures.push(`${name}: parseable but opened source-only (${opened.reason})`);
+          continue;
+        }
+        visual++;
+        if (serializeEditorState(opened.state) !== source) {
+          failures.push(`${name}: editor round-trip changed the bytes`);
+        }
+      }
+    }
+    console.log(`editor bridge: ${visual} visual and identical, ${sourceOnly} source-only`);
+    assert.deepEqual(failures, []);
+    assert.ok(visual > 500, `expected the whole corpus, saw ${visual} files`);
   });
 });
