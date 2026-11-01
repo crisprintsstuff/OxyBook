@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, type EditorApi } from './api.ts';
 import { DiffModal, ProposeDialog } from './dialogs.tsx';
 import {
@@ -15,7 +15,12 @@ import {
   type TreeResponse,
   uploadTarget,
 } from './model.ts';
-import { SourceEditor, type SourceEditorHandle } from './SourceEditor.tsx';
+import { type PageEditorHandle, SourceEditor } from './SourceEditor.tsx';
+
+// The visual editor carries the markdown parser; load it only when a page opens visually.
+const VisualEditor = lazy(() =>
+  import('./visual/VisualEditor.tsx').then((module) => ({ default: module.VisualEditor })),
+);
 
 type SaveState =
   | { kind: 'saved' }
@@ -32,6 +37,20 @@ interface OpenPage {
   initial: string;
   docKey: string;
   othersEditing: string[];
+  mode: EditorMode;
+  /** Why the visual editor could not open this page, when it fell back to source mode. */
+  fallback: string | null;
+}
+
+type EditorMode = 'visual' | 'source';
+const MODE_KEY = 'oxybook.editorMode';
+
+function preferredMode(): EditorMode {
+  try {
+    return window.localStorage.getItem(MODE_KEY) === 'source' ? 'source' : 'visual';
+  } catch {
+    return 'visual';
+  }
 }
 
 const SAVE_DELAY_MS = 800;
@@ -54,7 +73,7 @@ export function App({ api }: { api: EditorApi }) {
   const [dialog, setDialog] = useState<'diff' | 'propose' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const editor = useRef<SourceEditorHandle>(null);
+  const editor = useRef<PageEditorHandle>(null);
   const pageRef = useRef<OpenPage | null>(null);
   const version = useRef<number | null>(null);
   const text = useRef('');
@@ -169,6 +188,8 @@ export function App({ api }: { api: EditorApi }) {
           initial: loaded.source,
           docKey: `${path}#${++loads.current}`,
           othersEditing: loaded.othersEditing ?? [],
+          mode: /\.mdx?$/i.test(path) ? preferredMode() : 'source',
+          fallback: null,
         };
         pageRef.current = next;
         text.current = loaded.source;
@@ -281,6 +302,26 @@ export function App({ api }: { api: EditorApi }) {
     await loadPage(current.path);
   }
 
+  function switchMode(mode: EditorMode) {
+    const current = pageRef.current;
+    if (!current || current.mode === mode) return;
+    try {
+      window.localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      // Per-browser preference only.
+    }
+    // Remount the other editor on the latest text; the draft and save state carry over.
+    const next: OpenPage = {
+      ...current,
+      mode,
+      fallback: null,
+      initial: text.current,
+      docKey: `${current.path}#${++loads.current}`,
+    };
+    pageRef.current = next;
+    setPage(next);
+  }
+
   async function newPage() {
     if (!tree) return;
     const typed = window.prompt(
@@ -349,7 +390,7 @@ export function App({ api }: { api: EditorApi }) {
       const ifMatch = await ensureDraft();
       version.current = await api.upload(ifMatch, target.path, file);
       await refreshDraft();
-      editor.current?.insert(`![${altText(file.name)}](${target.reference})`);
+      editor.current?.insertImage(target.reference, altText(file.name));
       setNotice(`Uploaded ${target.path}. It is part of your draft.`);
     } catch (error) {
       setNotice(`Upload failed: ${errorText(error)}`);
@@ -502,7 +543,20 @@ export function App({ api }: { api: EditorApi }) {
                   </span>
                 )}
                 <span className="spacer" />
-                <span className="badge">source</span>
+                <fieldset className="mode-toggle" aria-label="Editor mode">
+                  {(['visual', 'source'] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      className={page.mode === mode ? 'on' : ''}
+                      aria-pressed={page.mode === mode}
+                      disabled={mode === 'visual' && !/\.mdx?$/i.test(page.path)}
+                      onClick={() => switchMode(mode)}
+                    >
+                      {mode === 'visual' ? 'Visual' : 'Source'}
+                    </button>
+                  ))}
+                </fieldset>
                 {canWrite && (
                   <>
                     <button type="button" onClick={() => fileInput.current?.click()}>
@@ -527,13 +581,36 @@ export function App({ api }: { api: EditorApi }) {
                   </>
                 )}
               </div>
-              <SourceEditor
-                ref={editor}
-                docKey={page.docKey}
-                initial={page.initial}
-                readOnly={!canWrite}
-                onChange={onChange}
-              />
+              {page.fallback && <div className="banner warn">{page.fallback}</div>}
+              {page.mode === 'visual' ? (
+                <Suspense fallback={<p className="empty muted">Loading the visual editor…</p>}>
+                  <VisualEditor
+                    ref={editor}
+                    docKey={page.docKey}
+                    initial={page.initial}
+                    path={page.path}
+                    readOnly={!canWrite}
+                    pages={tree.pages.map((p) => ({ path: p.path, title: p.title || p.relPath }))}
+                    onChange={onChange}
+                    onFallback={(reason) =>
+                      setPage((p) => {
+                        if (!p || p.docKey !== page.docKey) return p;
+                        const next = { ...p, mode: 'source' as const, fallback: reason };
+                        pageRef.current = next;
+                        return next;
+                      })
+                    }
+                  />
+                </Suspense>
+              ) : (
+                <SourceEditor
+                  ref={editor}
+                  docKey={page.docKey}
+                  initial={page.initial}
+                  readOnly={!canWrite}
+                  onChange={onChange}
+                />
+              )}
             </>
           ) : (
             <p className="empty muted">Pick a page on the left.</p>

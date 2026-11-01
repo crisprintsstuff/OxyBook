@@ -14,6 +14,6 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     // React and CodeMirror in one chunk; the editor is one authenticated page.
-    chunkSizeWarningLimit: 1200,
+    chunkSizeWarningLimit: 1000,
   },
 });

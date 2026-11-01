@@ -158,13 +158,17 @@ try {
 
   await page.goto(`${base}/orgs/cris/spaces/test/edit`);
   await page.getByRole('button', { name: 'Guide' }).waitFor();
-  await page.locator('.cm-content').waitFor();
-  assert.match((await page.locator('.cm-content').textContent()) ?? '', /weird: \[1, \{a: b\}\]/);
+
+  // The page opens in the visual editor; JSX and raw HTML show as kept-as-is blocks.
+  const editor = page.locator('.visual-editor .ProseMirror');
+  await editor.waitFor();
+  assert.match((await page.locator('.ob-raw').first().textContent()) ?? '', /<Tabs>/);
+  assert.equal(await page.locator('.ob-raw, .ob-raw-inline').count(), 2);
   const preview = page.frameLocator('iframe[title="Page preview"]');
   await preview.locator('h1', { hasText: 'Guide' }).waitFor();
 
   // Edit one paragraph.
-  await page.locator('.cm-line', { hasText: 'Read the [install page]' }).click();
+  await editor.locator('p', { hasText: 'Read the install page' }).click();
   await page.keyboard.press('End');
   await page.keyboard.type(' Then come back.');
   await page.getByRole('status').filter({ hasText: 'Saved' }).waitFor({ timeout: 10_000 });
@@ -175,10 +179,9 @@ try {
   await page.getByRole('button', { name: /Changes \(1\)/ }).click();
   const diff = page.locator('pre.diff');
   await diff.waitFor();
-  const lines = (await diff.locator('div.diff-add, div.diff-del').allTextContents()).map((l) =>
-    l.trim(),
-  );
-  assert.deepEqual(lines, [
+  const diffLines = async () =>
+    (await diff.locator('div.diff-add, div.diff-del').allTextContents()).map((l) => l.trim());
+  assert.deepEqual(await diffLines(), [
     '-Read the [install page](install.md).',
     '+Read the [install page](install.md). Then come back.',
   ]);
@@ -186,6 +189,42 @@ try {
     path: (process.env.E2E_SCREENSHOT ?? '/tmp/editor-e2e.png').replace('.png', '-diff.png'),
   });
   await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click();
+
+  // Link to another page with the picker: a relative file path goes in.
+  await editor.locator('p', { hasText: 'Then come back.' }).click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' See ');
+  await page.getByRole('button', { name: 'Link', exact: true }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /^Install/ })
+    .click();
+
+  // Change the title in page settings; only that frontmatter scalar changes.
+  await page.locator('.meta summary').click();
+  const title = page.getByLabel('Title', { exact: true });
+  await title.fill('Guide, revised');
+  await title.press('Enter');
+  await page.getByRole('status').filter({ hasText: 'Saved' }).waitFor({ timeout: 10_000 });
+  const expected = PAGE.replace('title: Guide\n', 'title: "Guide, revised"\n').replace(
+    '(install.md).',
+    '(install.md). Then come back. See [Install](install.md)',
+  );
+
+  // Source mode shows the same bytes.
+  await page.getByRole('button', { name: 'Source', exact: true }).click();
+  await page.locator('.cm-content').waitFor();
+  assert.match(
+    (await page.locator('.cm-content').textContent()) ?? '',
+    /Then come back\. See \[Install\]\(install\.md\)/,
+  );
+  await page.getByRole('button', { name: 'Visual', exact: true }).click();
+  await editor.waitFor();
+  await page.getByRole('status').filter({ hasText: 'Saved' }).waitFor({ timeout: 10_000 });
+  await preview.locator('p', { hasText: 'See Install' }).waitFor({ timeout: 10_000 });
+  await page.screenshot({
+    path: (process.env.E2E_SCREENSHOT ?? '/tmp/editor-e2e.png').replace('.png', '-meta.png'),
+  });
 
   // Propose.
   await page.getByRole('button', { name: 'Propose changes' }).click();
@@ -208,12 +247,11 @@ try {
     .select(['path', 'bytes'])
     .executeTakeFirstOrThrow();
   assert.equal(file.path, 'docs/guide.mdx');
-  assert.equal(
-    file.bytes?.toString('utf8'),
-    PAGE.replace('(install.md).', '(install.md). Then come back.'),
-  );
+  assert.equal(file.bytes?.toString('utf8'), expected);
   assert.deepEqual(errors, []);
-  console.log('editor e2e: open, edit, preview, diff, propose: ok');
+  console.log(
+    'editor e2e: visual edit, link picker, page settings, source mode, diff, propose: ok',
+  );
 } finally {
   await browser?.close();
   await app?.close();

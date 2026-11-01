@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { createHash } from 'node:crypto';
 import { gfmToMarkdown } from 'mdast-util-gfm';
 import { type Options, toMarkdown } from 'mdast-util-to-markdown';
 import {
@@ -12,6 +11,7 @@ import {
 import { divergence } from './identity.js';
 import { parse } from './parse.js';
 import { serialize } from './serialize.js';
+import { sha256Hex } from './sha256.js';
 import type {
   Block,
   Format,
@@ -207,10 +207,6 @@ export type OpenEditorResult =
       source: string;
       fileHash: string;
     };
-
-function sha256Hex(source: string): string {
-  return createHash('sha256').update(source, 'utf8').digest('hex');
-}
 
 /** Human-readable label for a raw preservation block or inline node (ARCHITECTURE §3.3). */
 export function describeRawNode(kind: RawKind, source: string, mdast?: MdastNode | null): string {

@@ -264,3 +264,16 @@ export function routeFromPath(pathname: string): { org: string; space: string } 
   const match = /^\/orgs\/([a-z0-9-]+)\/spaces\/([a-z0-9-]+)\/edit\/?$/.exec(pathname);
   return match?.[1] && match[2] ? { org: match[1], space: match[2] } : null;
 }
+
+/**
+ * The relative link from one page to another, as authored in markdown (ARCHITECTURE §2.5:
+ * internal links are relative file paths, so they also work on GitHub).
+ */
+export function relativeLink(fromPath: string, toPath: string): string {
+  const from = fromPath.split('/').slice(0, -1);
+  const to = toPath.split('/');
+  let shared = 0;
+  while (shared < from.length && shared < to.length - 1 && from[shared] === to[shared]) shared++;
+  const up = from.length - shared;
+  return [...Array(up).fill('..'), ...to.slice(shared)].join('/');
+}

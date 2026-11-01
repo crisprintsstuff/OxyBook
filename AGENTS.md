@@ -27,12 +27,13 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs) are done; next is slice 4, the editor. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs), and slice 4 (the editor: API, source mode, visual mode) are done; next is slice 5, `pnpm m2:exit`. Releases are tags (`docs/RELEASING.md`); `v0.1.0` is out. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
 ```
 apps/server            AGPL   HTTP process. /healthz, migrations on start, accounts/sessions, Sign in with GitHub, org/space UI, GitHub manifest flow, webhooks.
+apps/editor            AGPL   editor SPA: React, ProseMirror visual mode on the doc-model bridge, CodeMirror source mode.
 apps/worker            AGPL   worker process. /healthz; works jobs from the queue when DATABASE_URL is set.
 packages/doc-model     AGPL   parse, raw slices, serialize, identity check, CLIs (oxybook-roundtrip, oxybook-check).
 packages/github         AGPL   App JWT, installation-token cache, webhook HMAC, manifest exchange, open a pull request.
@@ -53,7 +54,7 @@ docs/M0-NOTES.md              measured results and design corrections.
 docs/M0-GITHUB-SPIKE.md       what the GitHub spike verified, and what it did not.
 ```
 
-`packages/sdk` and `apps/editor` are in the architecture and are not in the tree.
+`packages/sdk` is in the architecture and is not in the tree.
 
 ## How to run it
 
