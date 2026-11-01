@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/crisprintsstuff/OxyBook/actions/workflows/ci.yml/badge.svg)](https://github.com/crisprintsstuff/OxyBook/actions/workflows/ci.yml)
 ![status: early alpha](https://img.shields.io/badge/status-early%20alpha-orange)
-![release: none yet](https://img.shields.io/badge/release-none%20yet-lightgrey)
+[![release](https://img.shields.io/github/v/release/crisprintsstuff/OxyBook?include_prereleases&label=release)](https://github.com/crisprintsstuff/OxyBook/releases)
 ![license: AGPL-3.0 | Apache-2.0](https://img.shields.io/badge/license-AGPL--3.0%20%7C%20Apache--2.0-blue)
 ![node: 24](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
 ![runs on: Docker Compose](https://img.shields.io/badge/runs%20on-Docker%20Compose-2496ED?logo=docker&logoColor=white)
@@ -10,7 +10,7 @@
 
 A self-hostable documentation platform where the git repository is the source of truth. Writers edit pages in the browser; every change becomes a pull request in your GitHub repository; merged changes publish a static documentation site.
 
-> **Status: early alpha, looking for testers.** There is no release yet, and things will break. What works today, end to end on a real GitHub repository:
+> **Status: early alpha, looking for testers.** Releases are pre-releases (`0.x`), and things will break between them. What works today, end to end on a real GitHub repository:
 >
 > - Connect a repository through a GitHub App that OxyBook creates for you.
 > - Sync its markdown and MDX into OxyBook, and publish a static site with navigation, search, and redirects for renamed pages.
@@ -23,22 +23,27 @@ A self-hostable documentation platform where the git repository is the source of
 
 You need Docker with Compose v2, a GitHub account, and a **test repository** with a few markdown files in a folder such as `docs/`. GitHub has to reach OxyBook over HTTPS for webhooks and sign-in, so you also need a tunnel to your machine (a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/), `cloudflared tunnel --url`, ngrok, or similar).
 
-1. Clone and configure:
+1. Clone the latest release (see [Releases](https://github.com/crisprintsstuff/OxyBook/releases); `0.1.0` below is an example) and configure it:
 
    ```sh
-   git clone https://github.com/crisprintsstuff/OxyBook.git oxybook
+   VERSION=0.1.0
+   git clone --branch "v$VERSION" https://github.com/crisprintsstuff/OxyBook.git oxybook
    cd oxybook
    cp .env.example .env
    sed -i "s/^OXYBOOK_SECRET_KEY=.*/OXYBOOK_SECRET_KEY=$(openssl rand -hex 32)/" .env
+   echo "OXYBOOK_IMAGE=ghcr.io/crisprintsstuff/oxybook:$VERSION" >> .env
    ```
 
 2. Start a tunnel to `http://localhost:8080`, and set `OXYBOOK_PUBLIC_URL` in `.env` to its `https://` address. Do this before creating the GitHub App: the App is registered with that address.
 3. Start everything, and wait until every service reports `healthy`:
 
    ```sh
-   docker compose up -d --build
+   docker compose pull
+   docker compose up -d
    docker compose ps
    ```
+
+   `curl -s http://app.localhost:8080/healthz` reports the running version. To run the newest code on `main` instead of a release, clone without `--branch`, leave `OXYBOOK_IMAGE` unset, and use `docker compose up -d --build`.
 
 4. Open your public URL and sign up, then open `/setup/github` and create the GitHub App. Install it on your test repository only.
 5. On the dashboard, create an organisation and connect the repository (content folder `docs`, branch `main`). OxyBook syncs it and builds the site, served at `http://<space>.docs.localhost:8080`.
@@ -47,6 +52,8 @@ You need Docker with Compose v2, a GitHub account, and a **test repository** wit
 Optional: **Link GitHub account** on the dashboard makes proposed pull requests yours instead of the App's, and lets you use **Sign in with GitHub**. More detail, including running from source with `pnpm dev`, is in [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md).
 
 Stop with `docker compose down`. Add `-v` to delete volumes; `pgdata` holds accounts and unproposed drafts.
+
+To upgrade, read the new release's notes, back up the database, check out the new tag, set its image in `.env`, then `docker compose pull && docker compose up -d`. Migrations run when `app` starts and only go forward, so keep the backup until the new version works.
 
 ### Feedback
 

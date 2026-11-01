@@ -117,6 +117,13 @@ In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages
 
 ## Changelog
 
+### 2026-11-01 — Releases: tag → image → draft release
+
+- `.github/workflows/release.yml`: pushing a `vX.Y.Z` tag runs the CI checks (`ci.yml` is now also a reusable workflow, and its `push` trigger covers branches only), builds the image for `linux/amd64` and `linux/arm64`, pushes it to `ghcr.io/crisprintsstuff/oxybook` (version, `major.minor`, and `latest` unless the tag has a suffix), and creates a draft GitHub release, pre-release while below 1.0, with generated notes and upgrade steps. `actionlint` 1.7.7 passes. The workflow has not run yet: it runs on the first tag.
+- The image carries `OXYBOOK_VERSION` (build arg from the tag, `dev` otherwise). `/healthz` on app and worker returns it, and both log it at start.
+- README: a release badge, and "Try it" now clones a release tag and pulls its image (`OXYBOOK_IMAGE` in `.env`); building from `main` is the alternative. Upgrade steps added. The bug form asks for the version.
+- `docs/RELEASING.md`: versioning rules and the release checklist, including making the GHCR package public after the first release.
+
 ### 2026-11-01 — README for testers, issue templates, Caddy catch-all
 
 - README: badges, an early-alpha status that matches what works today, a "Try it" walkthrough (Docker Compose, a tunnel, GitHub App, connect, edit, propose), and a Feedback section. The old "Quickstart (local development)" moved to a short Development section that points at CONTRIBUTING.md and LIVE-INSTALL.md.

@@ -1,0 +1,98 @@
+name: Release
+
+# Push a tag such as v0.1.0 to publish a release (docs/RELEASING.md):
+#   1. the same checks as CI,
+#   2. the container image, pushed to ghcr.io/<owner>/oxybook as <version> (and `latest` for
+#      versions without a pre-release suffix such as -rc.1),
+#   3. a draft GitHub release, marked pre-release while the version is below 1.0, with notes
+#      generated from the merged pull requests. A maintainer edits and publishes it.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  image:
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.names.outputs.image }}
+      version: ${{ steps.names.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Names
+        id: names
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          owner="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/$owner/oxybook" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ steps.names.outputs.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+          labels: |
+            org.opencontainers.image.title=OxyBook
+            org.opencontainers.image.licenses=AGPL-3.0-only AND Apache-2.0
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: OXYBOOK_VERSION=${{ steps.names.outputs.version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  release:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Draft the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ needs.image.outputs.image }}
+          VERSION: ${{ needs.image.outputs.version }}
+        run: |
+          prerelease=""
+          case "$VERSION" in 0.*|*-*) prerelease="--prerelease" ;; esac
+          cat > notes.md <<NOTES
+          ## Install or upgrade
+
+          Image: \`$IMAGE:$VERSION\` (linux/amd64, linux/arm64)
+
+          New install: follow **Try it** in the README at this tag. Upgrade: back up the database first
+          (\`docker compose exec postgres pg_dump -U oxybook oxybook > oxybook-backup.sql\`), set
+          \`OXYBOOK_IMAGE=$IMAGE:$VERSION\` in \`.env\`, then \`git checkout $GITHUB_REF_NAME\`,
+          \`docker compose pull\` and \`docker compose up -d\`. Migrations run when \`app\` starts and only go forward.
+
+          NOTES
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft $prerelease \
+            --title "OxyBook $GITHUB_REF_NAME" --notes-file notes.md --generate-notes

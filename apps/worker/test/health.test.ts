@@ -10,7 +10,7 @@ describe('worker health', () => {
     try {
       const health = await fetch(`http://127.0.0.1:${server.port}/healthz`);
       assert.equal(health.status, 200);
-      assert.deepEqual(await health.json(), { ok: true, service: 'worker' });
+      assert.deepEqual(await health.json(), { ok: true, service: 'worker', version: 'dev' });
     } finally {
       await server.close();
     }
