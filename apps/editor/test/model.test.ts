@@ -10,6 +10,7 @@ import {
   diffLines,
   newPagePath,
   newPageSource,
+  relativeLink,
   routeFromPath,
   type TreePage,
   uploadTarget,
@@ -121,5 +122,16 @@ describe('editor model', () => {
   it('reads the org and space from the URL', () => {
     assert.deepEqual(routeFromPath('/orgs/cris/spaces/test/edit'), { org: 'cris', space: 'test' });
     assert.equal(routeFromPath('/orgs/cris/spaces/test'), null);
+  });
+
+  it('links pages with relative file paths', () => {
+    assert.equal(relativeLink('docs/guides/install.md', 'docs/guides/setup.md'), 'setup.md');
+    assert.equal(
+      relativeLink('docs/guides/install.md', 'docs/reference/cli.md'),
+      '../reference/cli.md',
+    );
+    assert.equal(relativeLink('docs/index.md', 'docs/guides/deep/a.mdx'), 'guides/deep/a.mdx');
+    assert.equal(relativeLink('docs/guides/deep/a.md', 'docs/index.md'), '../../index.md');
+    assert.equal(relativeLink('README.md', 'docs/a.md'), 'docs/a.md');
   });
 });

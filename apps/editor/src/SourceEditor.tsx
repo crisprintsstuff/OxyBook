@@ -7,12 +7,13 @@ import { basicSetup } from 'codemirror';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
 import { darkScheme, editorTheme } from './theme.ts';
 
-/** What the page can do to the source editor from outside. */
-export interface SourceEditorHandle {
-  /** Replace the selection with `text` and focus the editor. */
-  insert(text: string): void;
-  getText(): string;
+/** What the page can do to either editor (source or visual) from outside. */
+export interface PageEditorHandle {
+  /** Insert an image reference at the cursor and focus the editor. */
+  insertImage(src: string, alt: string): void;
 }
+
+export type SourceEditorHandle = PageEditorHandle;
 
 interface Props {
   /** A new document identity (path + load count) resets the editor and its undo history. */
@@ -85,14 +86,11 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
   }, []);
 
   useImperativeHandle(ref, () => ({
-    insert(text: string) {
+    insertImage(src: string, alt: string) {
       const v = view.current;
       if (!v) return;
-      v.dispatch(v.state.replaceSelection(text));
+      v.dispatch(v.state.replaceSelection(`![${alt}](${src})`));
       v.focus();
-    },
-    getText() {
-      return view.current?.state.doc.toString() ?? '';
     },
   }));
 

@@ -146,6 +146,8 @@ Each version is built from its own ref, with that ref's content and `_dir.yml` f
 
 **Decision: TipTap 3 for extension/React ergonomics, dropping to raw ProseMirror APIs (`prosemirror-model`, `prosemirror-transform`, NodeViews, plugins) wherever round-trip correctness is involved.** The deciding factors are the strict schema (the serializer must handle every node type exhaustively, and the schema makes "every node type" a closed set) and step maps (they tell us precisely which source regions are dirty, which is the core of the round-trip design). Lexical is a credible editor but its markdown story is transformer-based import/export, which is the normalising approach we must avoid, and it has no 1.0. Slate's beta status and normaliser-based validity make exhaustive, lossless serialization harder to guarantee.
 
+**As built (M2, 2026-11-01):** the editor uses ProseMirror directly (`prosemirror-model`, `-state`, `-view`, and the standard command, keymap, history, and input-rule packages) with a schema that mirrors the `doc-model` editor JSON one to one (`apps/editor/src/visual/schema.ts`). Every part the editor needed so far is on the "raw ProseMirror" side of the decision above, so TipTap would have added a second schema layer without removing any code. Dirty tracking uses node identity: ProseMirror keeps the node objects of top-level blocks a transaction did not touch, and those serialize from the side table byte for byte (`apps/editor/src/visual/bridge.ts`). TipTap stays an option if extension ergonomics start to matter.
+
 TipTap's own markdown extension is **not** used for import/export: it is a convenience converter and does not preserve source bytes. Markdown parsing and serialization are ours (`packages/doc-model`), built on unified/remark.
 
 ### 3.2 Supported (editable) constructs in v1
@@ -470,7 +472,7 @@ Horizontal scale in v1 is "more worker replicas": jobs are claimed through pg-bo
 | Repo layout | pnpm workspaces monorepo | strict dependency isolation, fast installs, no extra build orchestrator needed at this size |
 | API server | Fastify 5 | schema-validated routes, low overhead, plain Node; no full-stack framework needed because the editor is an SPA and sites are static |
 | Editor UI | React + Vite SPA | the editor is an authenticated single-page app; SSR adds nothing there |
-| Editor core | TipTap 3 on ProseMirror | strict schema and step maps make lossless round-trip tractable (3.1) |
+| Editor core | ProseMirror (TipTap 3 considered; see 3.1, as built) | strict schema and step maps make lossless round-trip tractable (3.1) |
 | Source mode | CodeMirror 6 | standard, extensible code editor; doubles as the raw-block viewer |
 | Markdown/MDX | unified, remark-parse, remark-gfm, remark-directive, remark-mdx (MDX 3) | positional mdast with exact offsets; the same parser for editor and renderer |
 | Frontmatter | `yaml` (Document API) | comment- and style-preserving edits |
@@ -490,7 +492,7 @@ Horizontal scale in v1 is "more worker replicas": jobs are claimed through pg-bo
 ```
 apps/server           AGPL-3.0   Fastify API, auth, webhooks
 apps/worker           AGPL-3.0   sync, propose, build jobs
-apps/editor           AGPL-3.0   React/TipTap editor SPA
+apps/editor           AGPL-3.0   React/ProseMirror editor SPA
 packages/doc-model    AGPL-3.0   parser, raw-preservation, serializer, style profile
 packages/renderer     AGPL-3.0   mdast → static HTML, build orchestration
 packages/sdk          Apache-2.0 config schema (oxybook.yml, _dir.yml), component and theme interfaces

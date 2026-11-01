@@ -4,7 +4,7 @@ import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } fr
 import type { EditorApi } from './api.ts';
 import { type DiffFile, type DraftSummary, diffLines } from './model.ts';
 
-function Modal({
+export function Modal({
   title,
   onClose,
   children,
