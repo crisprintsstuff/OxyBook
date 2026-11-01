@@ -289,3 +289,28 @@ The App created from `/setup/github` already has the callback URL `<OXYBOOK_PUBL
 4. Viewers see the same screen read-only.
 
 If the edit page says the editor is not built, run `pnpm build:editor` and reload.
+
+## M2 exit run
+
+`pnpm m2:exit <org>/<space>` measures the M2 exit sentence against your running stack and the space's GitHub repository. Use your test space only: it opens and merges real pull requests there.
+
+Before you run it:
+
+- `pnpm dev` is running (app and worker), and compose `caddy` serves the space's site.
+- The space is connected to its repository, and the push and `pull_request` webhooks reach the app.
+- You (a space admin or org owner) have linked your GitHub account on the dashboard and can merge in that repository. To pick a specific linked account, set `M2_EXIT_MERGER` to its OxyBook email.
+- The app answers at `http://127.0.0.1:$PORT` (`PORT` from `.env`), or set `M2_EXIT_APP_URL`.
+
+```sh
+pnpm m2:exit cris/test
+```
+
+What it does:
+
+1. Creates (once) an OxyBook account `m2-exit-writer@example.com` with no GitHub account, and makes it an editor of the space.
+2. The first time, adds `docs/m2-exit.mdx` (JSX components, raw HTML, unusual frontmatter) through a pull request, which you merge (the script merges it with your token).
+3. Edits one paragraph of that page through the editor API as the writer, and proposes it.
+4. Checks the pull request on GitHub: opened by the App, one file, and the diff is exactly that paragraph's line.
+5. Merges it with your GitHub account and waits for the published page to show the new text. It reports whether the push webhook did that, or whether it had to queue a sync by hand.
+
+It prints a JSON report at the end. Paste that report into the session so it can be recorded in `STATUS.md`.

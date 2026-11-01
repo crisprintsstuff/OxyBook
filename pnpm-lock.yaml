@@ -114,6 +114,9 @@ importers:
       '@oxybook/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@oxybook/doc-model':
+        specifier: workspace:*
+        version: link:../../packages/doc-model
       '@oxybook/drafts':
         specifier: workspace:*
         version: link:../../packages/drafts
