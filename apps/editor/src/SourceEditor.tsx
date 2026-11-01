@@ -1,0 +1,88 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { markdown } from '@codemirror/lang-markdown';
+import { Compartment, EditorState } from '@codemirror/state';
+import { EditorView } from '@codemirror/view';
+import { basicSetup } from 'codemirror';
+import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+
+/** What the page can do to the source editor from outside. */
+export interface SourceEditorHandle {
+  /** Replace the selection with `text` and focus the editor. */
+  insert(text: string): void;
+  getText(): string;
+}
+
+interface Props {
+  /** A new document identity (path + load count) resets the editor and its undo history. */
+  docKey: string;
+  initial: string;
+  readOnly: boolean;
+  onChange(text: string): void;
+}
+
+/**
+ * Source mode: CodeMirror 6 on the raw file (ARCHITECTURE §3.3). The bytes it shows are
+ * the bytes that are saved; nothing is normalised on the way in or out.
+ */
+export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function SourceEditor(
+  { docKey, initial, readOnly, onChange },
+  ref,
+) {
+  const host = useRef<HTMLDivElement>(null);
+  const view = useRef<EditorView | null>(null);
+  const editable = useRef(new Compartment());
+  const changed = useRef(onChange);
+  changed.current = onChange;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new docKey is the only reset; `initial` and `readOnly` are read once per document.
+  useEffect(() => {
+    if (!host.current) return;
+    const created = new EditorView({
+      parent: host.current,
+      state: EditorState.create({
+        doc: initial,
+        extensions: [
+          basicSetup,
+          markdown(),
+          EditorView.lineWrapping,
+          editable.current.of([
+            EditorState.readOnly.of(readOnly),
+            EditorView.editable.of(!readOnly),
+          ]),
+          EditorView.updateListener.of((update) => {
+            if (update.docChanged) changed.current(update.state.doc.toString());
+          }),
+        ],
+      }),
+    });
+    view.current = created;
+    return () => {
+      created.destroy();
+      view.current = null;
+    };
+  }, [docKey]);
+
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: editable.current.reconfigure([
+        EditorState.readOnly.of(readOnly),
+        EditorView.editable.of(!readOnly),
+      ]),
+    });
+  }, [readOnly]);
+
+  useImperativeHandle(ref, () => ({
+    insert(text: string) {
+      const v = view.current;
+      if (!v) return;
+      v.dispatch(v.state.replaceSelection(text));
+      v.focus();
+    },
+    getText() {
+      return view.current?.state.doc.toString() ?? '';
+    },
+  }));
+
+  return <div className="source-editor" ref={host} />;
+});

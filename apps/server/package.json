@@ -11,7 +11,8 @@
     "test": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/git-write --filter @oxybook/drafts --filter @oxybook/theme-default --filter @oxybook/renderer build && node --import tsx --test --test-concurrency=1 test/*.test.ts",
     "dev": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/git-write --filter @oxybook/drafts --filter @oxybook/theme-default --filter @oxybook/renderer build && tsx watch src/main.ts",
     "dev:watch": "tsx watch --exclude '../../packages/*/dist/**' --env-file-if-exists=../../.env src/main.ts",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "e2e:editor": "node --import tsx --env-file-if-exists=../../.env e2e/editor.e2e.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "2.2.2",

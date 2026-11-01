@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 and M1 complete. M2 in progress: slices 1–2 of `docs/M2-PLAN.md` are done (the editor document bridge, which CI now checks over all 595 corpus and fixture files, and drafts with `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase). Slice 3 is done in code: the propose job, `pull_request` webhooks, editor/viewer enforcement on propose (live propose → merge → site update ran on `oxybook-test`), plus Sign in with GitHub, account linking, and user-authored PRs (all checked live on `oxybook-test`). Slice 4 is under way: 4a, the editor's HTTP API, is done; next is 4b, the editor UI.
+- **Milestone:** M0 and M1 complete. M2 in progress: slices 1–2 of `docs/M2-PLAN.md` are done (the editor document bridge, which CI now checks over all 595 corpus and fixture files, and drafts with `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase). Slice 3 is done in code: the propose job, `pull_request` webhooks, editor/viewer enforcement on propose (live propose → merge → site update ran on `oxybook-test`), plus Sign in with GitHub, account linking, and user-authored PRs (all checked live on `oxybook-test`). Slice 4 is under way: 4a (the editor's HTTP API) and 4b (the editor UI in source mode) are done; next is 4c, the TipTap visual editor.
 - **Last update:** 2026-11-01.
 - **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -37,17 +37,25 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
   - Reads (any space role): `tree` (pages with title, URL, `othersEditing`, the user's role, a CSRF token, and their draft), `page?path=` (draft bytes if the draft has the file, else the synced blob, with `baseBlobSha`), `draft`, `draft/diff`, and `preview` (renders posted source with the build renderer and returns HTML plus warnings).
   - Writes need the `x-csrf-token` header and `editor` or `admin`: `draft` (open), `draft/file` (`PUT` with `If-Match`; add, modify, delete, rename), `DELETE draft/file`, `draft/discard`, `upload?path=` (images only, raw body, `If-Match`), and `draft/propose` (queues the `propose` job, 202).
   - A missing `If-Match` gets 428; a stale one gets 409 with the current version. A non-member gets 404, so the space's existence does not leak.
+- **Editor UI (`apps/editor`, M2 slice 4b):** a React + Vite SPA, served by the app at `/orgs/:org/spaces/:space/edit` (assets under `/editor-assets/`, with a CSP that allows only its own scripts). The space page has an **Edit pages** button.
+  - Sidebar page tree with a filter, marks for the user's drafted pages and for pages in others' open drafts, and **New page**.
+  - Source mode only so far: CodeMirror 6 on the raw file, so the saved bytes are exactly what was typed.
+  - Autosave about a second after typing stops, with `If-Match`. If another tab saved first, a banner offers to keep this tab's text or load the saved one.
+  - Live preview through the build renderer, in an iframe sandboxed with no permissions, with the renderer's warnings listed.
+  - **Changes (n)** shows the draft's unified diff. **Propose changes** / **Update pull request** takes a title and an optional DCO sign-off, then polls until the PR link appears or the job records an error.
+  - Also: image upload into `images/` next to the page (inserts a relative reference), revert a page, discard the draft. Viewers get the same screen read-only.
 - **Write path (`packages/git-write`):** `commitFiles` builds one commit from any mix of add, modify, delete, and rename, using a temporary index on the bare mirror. Its guards: content root or `oxybook.yml` only, never a hidden path (`.github/workflows` included), a size limit, and one op per path consistent with the base. It adds a DCO trailer only when asked. `mergeFile3` wraps `git merge-file`. Nothing pushes these commits yet (slice 3). The M0 `oxybook-dev propose` CLI pushes a single file to `oxybook/*` with `--force-with-lease` and opens a pull request. It opened oxybook-test#1 (hand-made App) and #2 (manifest-created App), each with a diff of exactly one file. Signed-commit ruleset behaviour is in `docs/M0-GITHUB-SPIKE.md`.
 - **Running it:** on the owner's machine, `pnpm dev` runs app and worker on the host (`PORT=3100`, `HEALTH_PORT=3101`, because Grafana holds 3000), with compose `postgres` and `caddy` (`CADDY_PORT=8180`, because qBittorrent holds 8080) and a Cloudflare tunnel `oxybook.boznetwork.com` → `localhost:3100`. Host processes read the repo `.env`. The container image (`docker compose up --build`) also starts and migrates. Steps are in `docs/LIVE-INSTALL.md`.
 - **CI:** `.github/workflows/ci.yml` starts `postgres:17` and runs lint, typecheck, test, `db:migrate`, and `test:corpus`. Database test files run one at a time (see M1-NOTES.md, sharp edge). Results are on the Actions tab.
-- **What does not exist:** the editor UI (`apps/editor`, slices 4b and 4c), the conflict-resolution view. The Git Database API fallback for signed-commit rulesets is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` do not exist. The supported Node is 24; the owner's machine runs 22.23.1 with an engine warning.
+- **What does not exist:** the visual (TipTap) editor and metadata panel (slice 4c), the link picker, the conflict-resolution view. The source editor highlights YAML frontmatter as markdown. The Git Database API fallback for signed-commit rulesets is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` do not exist. The supported Node is 24; the owner's machine runs 22.23.1 with an engine warning.
 
 ## Handoff
 
 For the next session, human or agent.
 
 - **Resume here:**
-  - **M2 slice 4b:** the editor SPA (`apps/editor`): page tree, source mode, preview, diff, Propose, autosave, on top of the slice 4a API. Then 4c, the TipTap visual editor. Slices 1–3 are done and verified live.
+  - **Try the editor live:** after pulling, `pnpm install --frozen-lockfile` and restart `pnpm dev`, then **Edit pages** on `cris/test` (LIVE-INSTALL.md, "Edit in the browser"). Not yet run on the owner's machine.
+  - **M2 slice 4c:** the TipTap visual editor on the `doc-model` bridge, the metadata panel, and the link picker. Then slice 5, `pnpm m2:exit`.
   - **Open on `oxybook-test`:** [#7](https://github.com/crisprintsstuff/oxybook-test/pull/7), the user-authored test PR. Merging it should mark its draft `merged`.
 - **Owner's live setup:** App `oxybook-cris` (App id 5535294, installation 176737174 on `crisprintsstuff/oxybook-test`), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.boznetwork.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
 - **After every pull:** `git pull && pnpm install --frozen-lockfile`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own. New migrations apply only with `OXYBOOK_MIGRATE_ON_START=true` in `.env` or `pnpm db:migrate`.
@@ -96,7 +104,7 @@ Still unverified. These are not the exit sentence, and they are not done:
 
 ## M2 next
 
-In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages/doc-model` editor document model and dirty-block bridge) is done. Slice 2 (drafts, `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase) is done. Slice 3 (propose, Sign in with GitHub) is done. Slice 4a (the editor API) is done; next is 4b. Scope from `docs/MVP.md`:
+In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages/doc-model` editor document model and dirty-block bridge) is done. Slice 2 (drafts, `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase) is done. Slice 3 (propose, Sign in with GitHub) is done. Slices 4a (the editor API) and 4b (the editor UI, source mode) are done; next is 4c. Scope from `docs/MVP.md`:
 
 - Editor SPA (`apps/editor`): page tree, TipTap editor for the ARCHITECTURE §3.2 constructs, raw block/inline NodeViews, source mode (CodeMirror 6), metadata panel, image upload, link picker inserting relative paths, in-editor preview through the renderer. *Editor document schema, raw nodes, and metadata panel model are in `packages/doc-model` (slice 1); the browser SPA is slice 4.*
 - Dirty-block tracking via step maps; serializer integration. *Done in `packages/doc-model` (`editor-doc.ts`, slice 1).*
@@ -107,6 +115,14 @@ In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages
 **Done when:** an end-to-end test edits one paragraph in an `.mdx` page containing JSX components, raw HTML and unusual frontmatter, and the resulting PR diff touches only that paragraph's lines; a non-GitHub user can propose a change that a GitHub user then merges, and the site updates.
 
 ## Changelog
+
+### 2026-11-01 — M2 slice 4b: the editor UI, source mode
+
+- New `apps/editor` (React 19, Vite 8, CodeMirror 6, `AGPL-3.0-only`), built to `apps/editor/dist`. `apps/server/src/editor-assets.ts` serves it at `/orgs/:org/spaces/:space/edit` and `/editor-assets/*`, refusing paths outside `dist`, dotfiles, and unknown types. `pnpm dev` builds and watches it. The Dockerfile builds it (unverified: the image was not rebuilt in this session).
+- The draft summary from `/api/editor` now includes `pushedSha`, so the Propose dialog can tell when a push landed.
+- Tests: `apps/editor/test/model.test.ts` (5: page tree, upload paths, new-page paths, diff lines, routes) and `apps/server/test/editor-assets.test.ts` (3). Server suite 30 pass.
+- Browser check, `pnpm e2e:editor` (`apps/server/e2e/editor.e2e.ts`, needs Playwright and Chromium, not in CI): with the real app server against a scratch schema, Chromium opens the editor, edits one paragraph of an `.mdx` page with frontmatter, JSX, and raw HTML, waits for **Saved**, sees the preview update, opens the diff (exactly one `-` and one `+` line), and proposes with a title and sign-off. The propose job was a stand-in that marks the draft proposed; the saved draft bytes equal the original with only that line changed. Passed in this session, with no browser console errors.
+- Not yet run on the owner's machine or against GitHub.
 
 ### 2026-11-01 — M2 slice 4a: editor HTTP API
 

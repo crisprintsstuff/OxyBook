@@ -100,6 +100,7 @@ function draftSummary(draft: Draft | null, files: Awaited<ReturnType<typeof list
     branch: draft.branch,
     prNumber: draft.prNumber,
     prUrl: draft.prUrl,
+    pushedSha: draft.pushedSha,
     proposeError: draft.proposeError,
     files: files.map((f) => ({ path: f.path, op: f.op, oldPath: f.oldPath })),
   };
