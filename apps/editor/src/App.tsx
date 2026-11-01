@@ -630,14 +630,23 @@ function DraftBanner({
 }
 
 const PREVIEW_STYLE = `
-  body { font: 16px/1.6 system-ui, sans-serif; margin: 0; padding: 16px 20px; color: #1f2328; }
-  pre { background: #f6f8fa; padding: 12px; overflow: auto; border-radius: 6px; }
+  :root { color-scheme: light dark; --fg: #1f2328; --bg: #ffffff; --muted: #59636e; --line: #d0d7de; --panel: #f6f8fa; --link: #0969da; --warn: #9a6700; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fg: #e6edf3; --bg: #0d1117; --muted: #8b949e; --line: #30363d; --panel: #161b22; --link: #58a6ff; --warn: #d29922; }
+  }
+  body { font: 16px/1.6 system-ui, sans-serif; margin: 0; padding: 16px 20px; color: var(--fg); background: var(--bg); }
+  a { color: var(--link); }
+  pre { background: var(--panel); padding: 12px; overflow: auto; border-radius: 6px; }
   code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em; }
-  table { border-collapse: collapse; } td, th { border: 1px solid #d0d7de; padding: 4px 8px; }
+  table { border-collapse: collapse; } td, th { border: 1px solid var(--line); padding: 4px 8px; }
   img { max-width: 100%; }
-  blockquote { margin: 0; padding-left: 12px; border-left: 4px solid #d0d7de; color: #59636e; }
-  .shiki span { color: var(--shiki-light); }
-  [data-oxybook-placeholder], .oxybook-placeholder { border: 1px dashed #bf8700; padding: 6px; }
+  hr { border: 0; border-top: 1px solid var(--line); }
+  blockquote { margin: 0; padding-left: 12px; border-left: 4px solid var(--line); color: var(--muted); }
+  .shiki, .shiki span { color: var(--shiki-light); background-color: var(--shiki-light-bg, transparent); }
+  @media (prefers-color-scheme: dark) {
+    .shiki, .shiki span { color: var(--shiki-dark); background-color: var(--shiki-dark-bg, transparent); }
+  }
+  [data-oxybook-placeholder], .oxybook-placeholder { border: 1px dashed var(--warn); padding: 6px; }
 `;
 
 function PreviewPane({ preview }: { preview: PreviewResponse | null }) {

@@ -147,7 +147,9 @@ try {
   const base = `http://127.0.0.1:${app?.port}`;
 
   browser = await chromium.launch();
-  const context = await browser.newContext();
+  const context = await browser.newContext({
+    colorScheme: process.env.E2E_COLOR_SCHEME === 'dark' ? 'dark' : 'light',
+  });
   await context.addCookies([{ name: SESSION_COOKIE_NAME, value: session.token, url: base }]);
   const page = await context.newPage();
   const errors: string[] = [];
