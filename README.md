@@ -13,20 +13,36 @@ A self-hostable documentation platform where the git repository is the source of
 > **Status: early alpha, looking for testers.** Releases are pre-releases (`0.x`), and things will break between them. What works today, end to end on a real GitHub repository:
 >
 > - Connect a repository through a GitHub App that OxyBook creates for you.
-> - Sync its markdown and MDX into OxyBook, and publish a static site with navigation, search, and redirects for renamed pages.
-> - Edit pages in the browser (source mode, with live preview and autosave), review the exact diff, and **propose** it: OxyBook opens a pull request on an `oxybook/*` branch. If you link your GitHub account, the pull request is yours; otherwise the App opens it.
+> - Sync its markdown and MDX, and publish a static site with navigation, search, and redirects for renamed pages.
+> - Edit pages in the browser in a **visual editor** or in **source mode**, with live preview and autosave. MDX components, raw HTML and anything else the editor does not edit stay exactly as they are.
+> - Review the exact diff and **propose** it: OxyBook opens a pull request on an `oxybook/*` branch. If you link your GitHub account, the pull request is yours; otherwise the App opens it.
 > - When the pull request is merged, the site rebuilds.
 >
-> Not yet: the visual block editor (pages are edited as markdown text for now), versions, custom domains, email, and a conflict view. [STATUS.md](STATUS.md) says exactly what works and what was measured. The feature list below is what v1 will ship, not what exists today.
+> Not yet: versions, a conflict view, renames from the editor, custom domains, and email. [STATUS.md](STATUS.md) says exactly what works and what was measured. The feature list below is what v1 will ship, not what exists today.
+
+## What "never rewrites your bytes" means, measured
+
+- **The editor round-trip:** every file in a corpus of 595 real documentation files (Docusaurus, VitePress, Starlight, MkDocs, Material for MkDocs, plus adversarial fixtures) that opens in the visual editor is saved back byte-identical when nothing is edited. Typing into one paragraph changes only that paragraph's bytes. CI checks both on every change.
+- **On a live repository** (`pnpm m2:exit`): a one-paragraph edit to an `.mdx` page with JSX components, raw HTML and unusual frontmatter became a pull request with a one-line diff. A user without a GitHub account proposed it, a GitHub user merged it, and the site updated 4 seconds later.
+
+## Roadmap
+
+| Milestone | What it delivers | Status |
+| --- | --- | --- |
+| M0 | Lossless markdown/MDX round-trip, GitHub App, first real pull request | done |
+| M1 | Sync from the repository, published static site with nav and search | done |
+| M2 | Browser editor (visual and source), drafts, pull requests, Sign in with GitHub | done (`v0.2.0`) |
+| M3 | Conflict view, versions from branches and tags, renames with redirects | next |
+| M4 | Production readiness, `v1.0` | planned |
 
 ## Try it
 
 You need Docker with Compose v2, a GitHub account, and a **test repository** with a few markdown files in a folder such as `docs/`. GitHub has to reach OxyBook over HTTPS for webhooks and sign-in, so you also need a tunnel to your machine (a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/), `cloudflared tunnel --url`, ngrok, or similar).
 
-1. Clone the latest release (see [Releases](https://github.com/crisprintsstuff/OxyBook/releases); `0.1.0` below is an example) and configure it:
+1. Clone the latest release (see [Releases](https://github.com/crisprintsstuff/OxyBook/releases); `0.2.0` below is an example) and configure it:
 
    ```sh
-   VERSION=0.1.0
+   VERSION=0.2.0
    git clone --branch "v$VERSION" https://github.com/crisprintsstuff/OxyBook.git oxybook
    cd oxybook
    cp .env.example .env
@@ -47,7 +63,7 @@ You need Docker with Compose v2, a GitHub account, and a **test repository** wit
 
 4. Open your public URL and sign up, then open `/setup/github` and create the GitHub App. Install it on your test repository only.
 5. On the dashboard, create an organisation and connect the repository (content folder `docs`, branch `main`). OxyBook syncs it and builds the site, served at `http://<space>.docs.localhost:8080`.
-6. Open the space and click **Edit pages**. Change something, look at **Changes**, and click **Propose changes**. The pull request appears on GitHub; merge it there and the site rebuilds.
+6. Open the space and click **Edit pages**. Pages open in the visual editor (**Source** switches to the raw file). Change something, look at **Changes**, and click **Propose changes**. The pull request appears on GitHub; merge it there and the site rebuilds.
 
 Optional: **Link GitHub account** on the dashboard makes proposed pull requests yours instead of the App's, and lets you use **Sign in with GitHub**. More detail, including running from source with `pnpm dev`, is in [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md).
 
@@ -74,7 +90,7 @@ Documentation teams keep choosing between two bad options. Hosted wiki-style edi
 
 1. Install the OxyBook GitHub App on a repository and pick a content directory (for example `docs/`).
 2. The file tree becomes the page tree. Frontmatter is page metadata. Ordering lives in small `_dir.yml` files.
-3. Writers edit pages in the browser (a block editor in v1; source mode today). MDX components, raw HTML and anything else the editor cannot represent appear as read-only raw blocks and are preserved byte-for-byte.
+3. Writers edit pages in the browser, in a visual editor or in source mode. MDX components, raw HTML and anything else the editor cannot represent appear as read-only raw blocks and are preserved byte-for-byte.
 4. **Propose changes** opens a pull request on an `oxybook/*` branch containing only the lines that changed. OxyBook never pushes to your base branch.
 5. When the PR is merged, a webhook triggers a static rebuild of the affected version, served by Caddy.
 
@@ -85,7 +101,7 @@ Design details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Scope and mileston
 ### v1 (first release)
 
 - GitHub App integration: webhook-driven sync with periodic reconciliation; changes go out as pull requests in your repository.
-- Block editor (TipTap/ProseMirror): headings, lists, task lists, tables, code blocks, images, links, callouts (`:::note` directives and GitHub `> [!NOTE]` alerts).
+- Visual editor (ProseMirror): headings, lists, task lists, tables, code blocks, images, links, callouts (`:::note` directives and GitHub `> [!NOTE]` alerts).
 - Lossless round-trip: unedited blocks keep their exact bytes; MDX/JSX, raw HTML, unknown directives and unparseable frontmatter are preserved as read-only raw blocks; source mode for anything else. Enforced by an identity check on every file load and a CI corpus of real documentation repos.
 - Drafts with autosave, exact diff preview before proposing, follow-up commits to an open PR, optional DCO `Signed-off-by` trailer.
 - Automatic three-way merge when the base branch moves, plus a block-level conflict view.
