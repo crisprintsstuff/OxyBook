@@ -1,0 +1,11 @@
+name: Feedback or idea
+description: Tell us what was confusing, missing, or great.
+labels: ["feedback"]
+body:
+  - type: textarea
+    id: feedback
+    attributes:
+      label: Feedback
+      description: What were you trying to do, and how did it go?
+    validations:
+      required: true

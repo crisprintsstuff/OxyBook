@@ -117,6 +117,13 @@ In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages
 
 ## Changelog
 
+### 2026-11-01 — README for testers, issue templates, Caddy catch-all
+
+- README: badges, an early-alpha status that matches what works today, a "Try it" walkthrough (Docker Compose, a tunnel, GitHub App, connect, edit, propose), and a Feedback section. The old "Quickstart (local development)" moved to a short Development section that points at CONTRIBUTING.md and LIVE-INSTALL.md.
+- `.github/ISSUE_TEMPLATE/`: a bug report form (asks whether OxyBook changed bytes it should not have), a feedback form, and a link to private security reporting.
+- `deploy/caddy/Caddyfile.dev`: any host other than `app.localhost` and `*.docs.localhost` now goes to the app, so a tunnel pointed at Caddy's port reaches the editor, setup, and webhooks. Checked in this session with `caddy:2` (`caddy validate`, then real requests with the app on the host): `Host: oxybook.example.com` and `Host: app.localhost` both got the app's `/healthz` (200) and the editor page (200), and `test.docs.localhost` still went to the site file server.
+- Unverified: the full "Try it" path in Docker. The image cannot be built in this session (the sandbox blocks `deb.debian.org`); the image was last built and started on the owner's machine before the editor existed.
+
 ### 2026-11-01 — Editor follows dark mode
 
 - The owner found the white editor jarring next to the dark dashboard. The editor page, the CodeMirror source editor (`apps/editor/src/theme.ts`, GitHub light/dark colours), and the preview iframe now follow `prefers-color-scheme`, and switch live when the system setting changes.

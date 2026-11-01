@@ -26,3 +26,9 @@ http://*.docs.localhost {
 		file_server
 	}
 }
+
+# Any other host: the app, so a tunnel (Cloudflare Tunnel, ngrok, …) pointed at this port
+# with OXYBOOK_PUBLIC_URL set to its hostname reaches the editor, setup, and webhooks.
+http:// {
+	reverse_proxy app:3000
+}

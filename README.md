@@ -1,8 +1,56 @@
 # OxyBook
 
-A self-hostable documentation platform where the git repository is the source of truth. Writers use a block editor; every change becomes a pull request in your GitHub repository; merged changes publish a versioned documentation site.
+[![CI](https://github.com/crisprintsstuff/OxyBook/actions/workflows/ci.yml/badge.svg)](https://github.com/crisprintsstuff/OxyBook/actions/workflows/ci.yml)
+![status: early alpha](https://img.shields.io/badge/status-early%20alpha-orange)
+![release: none yet](https://img.shields.io/badge/release-none%20yet-lightgrey)
+![license: AGPL-3.0 | Apache-2.0](https://img.shields.io/badge/license-AGPL--3.0%20%7C%20Apache--2.0-blue)
+![node: 24](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
+![runs on: Docker Compose](https://img.shields.io/badge/runs%20on-Docker%20Compose-2496ED?logo=docker&logoColor=white)
+![git host: GitHub](https://img.shields.io/badge/git%20host-GitHub-181717?logo=github)
 
-> **Status: early development, no release.** The round-trip library, accounts and sessions, the GitHub App setup and repository connection UI, the sync from a repository into PostgreSQL, the markdown/MDX renderer, and static site builds served by Caddy work. There is no block editor yet (`apps/editor` is M2). [STATUS.md](STATUS.md) says exactly what works and what was measured. The feature list below is what v1 will ship, not what exists today.
+A self-hostable documentation platform where the git repository is the source of truth. Writers edit pages in the browser; every change becomes a pull request in your GitHub repository; merged changes publish a static documentation site.
+
+> **Status: early alpha, looking for testers.** There is no release yet, and things will break. What works today, end to end on a real GitHub repository:
+>
+> - Connect a repository through a GitHub App that OxyBook creates for you.
+> - Sync its markdown and MDX into OxyBook, and publish a static site with navigation, search, and redirects for renamed pages.
+> - Edit pages in the browser (source mode, with live preview and autosave), review the exact diff, and **propose** it: OxyBook opens a pull request on an `oxybook/*` branch. If you link your GitHub account, the pull request is yours; otherwise the App opens it.
+> - When the pull request is merged, the site rebuilds.
+>
+> Not yet: the visual block editor (pages are edited as markdown text for now), versions, custom domains, email, and a conflict view. [STATUS.md](STATUS.md) says exactly what works and what was measured. The feature list below is what v1 will ship, not what exists today.
+
+## Try it
+
+You need Docker with Compose v2, a GitHub account, and a **test repository** with a few markdown files in a folder such as `docs/`. GitHub has to reach OxyBook over HTTPS for webhooks and sign-in, so you also need a tunnel to your machine (a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/), `cloudflared tunnel --url`, ngrok, or similar).
+
+1. Clone and configure:
+
+   ```sh
+   git clone https://github.com/crisprintsstuff/OxyBook.git oxybook
+   cd oxybook
+   cp .env.example .env
+   sed -i "s/^OXYBOOK_SECRET_KEY=.*/OXYBOOK_SECRET_KEY=$(openssl rand -hex 32)/" .env
+   ```
+
+2. Start a tunnel to `http://localhost:8080`, and set `OXYBOOK_PUBLIC_URL` in `.env` to its `https://` address. Do this before creating the GitHub App: the App is registered with that address.
+3. Start everything, and wait until every service reports `healthy`:
+
+   ```sh
+   docker compose up -d --build
+   docker compose ps
+   ```
+
+4. Open your public URL and sign up, then open `/setup/github` and create the GitHub App. Install it on your test repository only.
+5. On the dashboard, create an organisation and connect the repository (content folder `docs`, branch `main`). OxyBook syncs it and builds the site, served at `http://<space>.docs.localhost:8080`.
+6. Open the space and click **Edit pages**. Change something, look at **Changes**, and click **Propose changes**. The pull request appears on GitHub; merge it there and the site rebuilds.
+
+Optional: **Link GitHub account** on the dashboard makes proposed pull requests yours instead of the App's, and lets you use **Sign in with GitHub**. More detail, including running from source with `pnpm dev`, is in [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md).
+
+Stop with `docker compose down`. Add `-v` to delete volumes; `pgdata` holds accounts and unproposed drafts.
+
+### Feedback
+
+Please [open an issue](https://github.com/crisprintsstuff/OxyBook/issues/new/choose) for anything that breaks, confuses you, or surprises you. The most valuable report is a pull request diff that touches lines you did not edit: attach the smallest file that shows it. Report security problems privately ([Security tab](https://github.com/crisprintsstuff/OxyBook/security/advisories/new)), not in public issues. Use a test repository and a test GitHub App while OxyBook is in alpha.
 
 ## Pitch
 
@@ -19,7 +67,7 @@ Documentation teams keep choosing between two bad options. Hosted wiki-style edi
 
 1. Install the OxyBook GitHub App on a repository and pick a content directory (for example `docs/`).
 2. The file tree becomes the page tree. Frontmatter is page metadata. Ordering lives in small `_dir.yml` files.
-3. Writers edit pages in a block editor. MDX components, raw HTML and anything else the editor cannot represent appear as read-only raw blocks and are preserved byte-for-byte.
+3. Writers edit pages in the browser (a block editor in v1; source mode today). MDX components, raw HTML and anything else the editor cannot represent appear as read-only raw blocks and are preserved byte-for-byte.
 4. **Propose changes** opens a pull request on an `oxybook/*` branch containing only the lines that changed. OxyBook never pushes to your base branch.
 5. When the PR is merged, a webhook triggers a static rebuild of the affected version, served by Caddy.
 
@@ -50,31 +98,9 @@ Design details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). Scope and mileston
 
 The full list of v1 non-goals, with reasons, is in [docs/MVP.md](docs/MVP.md#non-goals-for-v1).
 
-## Quickstart (local development)
+## Development
 
-Requirements: Docker with Compose v2, and a GitHub account that can create a GitHub App.
-
-```sh
-git clone <this-repository-url> oxybook
-cd oxybook
-cp .env.example .env
-# set OXYBOOK_SECRET_KEY:
-#   sed -i "s/^OXYBOOK_SECRET_KEY=.*/OXYBOOK_SECRET_KEY=$(openssl rand -hex 32)/" .env
-
-docker compose up -d
-docker compose ps            # wait until every service reports "healthy"
-```
-
-What that gives you today:
-
-- `app` (API and GitHub webhooks) and `worker` (jobs and sync) report healthy. Migrations run when `app` starts.
-- `/setup/github` creates a GitHub App with the App Manifest flow and stores its credentials, encrypted under `OXYBOOK_SECRET_KEY`. GitHub must reach the app over HTTPS to deliver webhooks: use a tunnel, as described in [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md), or the `webhooks` compose profile with a smee.io channel.
-- Spaces can be created from the web UI (`/` after signing up at `/signup`) or with `pnpm oxybook-admin space create <org>/<space> --repo owner/repo` (see LIVE-INSTALL.md). Connecting a repository or pushing to the space's branch syncs its pages into PostgreSQL and builds the static site into `/srv/sites` (`./.oxybook-sites` on the host), served by Caddy at `http://<space-slug>.docs.localhost:8080`. `pnpm oxybook-admin pages <org>/<space>` lists synced pages, and `pnpm oxybook-admin build <org>/<space> [--now]` triggers a build.
-- Not yet: the block editor, drafts, Sign in with GitHub, and email. Those come in M2–M4 ([docs/MVP.md](docs/MVP.md)).
-
-For development on the host instead of in containers (`pnpm dev`), see [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md).
-
-Stop with `docker compose down`. Add `-v` to delete volumes; `pgdata` holds accounts and unproposed drafts.
+Running from source (`pnpm dev`), tests, and conventions are in [CONTRIBUTING.md](CONTRIBUTING.md) and [docs/LIVE-INSTALL.md](docs/LIVE-INSTALL.md). Milestones and what each one measured are in [STATUS.md](STATUS.md).
 
 ## Why not just use…
 
