@@ -65,7 +65,7 @@ describe('orgs and spaces', { skip: url ? false : 'DATABASE_URL is not set' }, (
       name: 'Test site',
       owner: 'crisprintsstuff',
       repo: 'oxybook-test',
-      installationId: 176737174,
+      installationId: 7654321,
       contentRoot: 'docs/',
       defaultRef: 'main',
     });
@@ -88,7 +88,7 @@ describe('orgs and spaces', { skip: url ? false : 'DATABASE_URL is not set' }, (
         space: 'test',
         name: 'Test site',
         repo: 'crisprintsstuff/oxybook-test',
-        installationId: '176737174',
+        installationId: '7654321',
         contentRoot: 'docs',
         defaultRef: 'main',
       },
@@ -103,7 +103,7 @@ describe('orgs and spaces', { skip: url ? false : 'DATABASE_URL is not set' }, (
     );
     const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
     await saveAppCredentials(db, deriveSecretsKey(secret), {
-      id: 5535294,
+      id: 1234567,
       slug: 'oxybook-cris',
       clientId: 'c',
       clientSecret: 's',
@@ -118,9 +118,9 @@ describe('orgs and spaces', { skip: url ? false : 'DATABASE_URL is not set' }, (
       }) as typeof fetch;
     assert.equal(
       await lookupInstallation(db, secret, 'crisprintsstuff', 'oxybook-test', {
-        fetch: github(200, { id: 176737174, account: { login: 'crisprintsstuff' } }),
+        fetch: github(200, { id: 7654321, account: { login: 'crisprintsstuff' } }),
       }),
-      176737174,
+      7654321,
     );
     assert.equal(seen[0], 'https://api.github.com/repos/crisprintsstuff/oxybook-test/installation');
     await assert.rejects(

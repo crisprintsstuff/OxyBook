@@ -86,6 +86,7 @@ pnpm oxybook-dev propose <file> --remote file:///path/to/remote.git
 ## Conventions
 
 - Commit subject: `<area>: <imperative>`, at most 72 characters. Areas are listed in `CONTRIBUTING.md`. The body says why.
+- This repository is public. Never write the owner's own hostnames, tunnel URLs, or email addresses into it (docs, tests, changelog entries, commit messages). Use `example.com` placeholders such as `oxybook.example.com` and `you@example.com`.
 - One logical change per commit. Do not mix a doc-model behavior change with a drive-by reformat of unrelated files.
 - Keep `docs/ARCHITECTURE.md` and `docs/MVP.md` accurate when you change a design decision. If you are not allowed to edit them, record the correction in `docs/M0-NOTES.md` and in `STATUS.md`. Do not leave a known lie in the design docs without a pointer.
 - New markdown fixtures that depend on exact bytes (CRLF, BOM) need `corpus/fixtures/** -text` in `.gitattributes`, which is already set. Do not "normalize" those files.

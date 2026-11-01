@@ -69,7 +69,7 @@ describe('Sign in with GitHub and account linking', {
     db = createDb(url as string, { max: 3, searchPath: schema });
     await migrateToLatest(db, { schema });
     await saveAppCredentials(db, deriveSecretsKey(SECRET), {
-      id: 5535294,
+      id: 1234567,
       slug: 'oxybook-cris',
       clientId: 'Iv1.client',
       clientSecret: 'client-secret',
