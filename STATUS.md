@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0 and M1 complete. M2 in progress: slices 1–2 of `docs/M2-PLAN.md` are done (the editor document bridge, which CI now checks over all 595 corpus and fixture files, and drafts with `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase). Slice 3 is done in code: the propose job, `pull_request` webhooks, editor/viewer enforcement on propose (live propose → merge → site update ran on `oxybook-test`), plus Sign in with GitHub, account linking, and user-authored PRs (all checked live on `oxybook-test`). Slice 4 (the editor: API, source mode, and visual mode) is done. Slice 5's script, `pnpm m2:exit`, exists and has not been run yet; running it on the owner's machine is what closes M2. Released as `v0.1.0` (source mode only); the visual editor will be `v0.2.0`.
+- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) has not started.
 - **Last update:** 2026-11-01.
 - **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -57,7 +57,8 @@ For the next session, human or agent.
 
 - **Resume here:**
   - **Try the editor live:** after pulling, `pnpm install --frozen-lockfile` and restart `pnpm dev`, then **Edit pages** on `cris/test` (LIVE-INSTALL.md, "Edit in the browser"). Not yet run on the owner's machine.
-  - **Run `pnpm m2:exit cris/test`** on the owner's machine (LIVE-INSTALL.md, "M2 exit run") and record its JSON report here. If it passes, M2 is complete; then cut `v0.2.0` (`docs/RELEASING.md`).
+  - **Cut `v0.2.0`** (`docs/RELEASING.md`): M2 is complete.
+  - **M3** (`docs/MVP.md`): the block-level conflict view, versions mapped to branches and tags, renames with redirects and link rewriting. It needs a plan (`docs/M3-PLAN.md`) first.
   - **Open on `oxybook-test`:** [#7](https://github.com/crisprintsstuff/oxybook-test/pull/7), the user-authored test PR. Merging it should mark its draft `merged`.
 - **Owner's live setup:** App `oxybook-cris`, installed on `crisprintsstuff/oxybook-test` (its App id and installation id are stored in the database), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.example.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
 - **After every pull:** `git pull && pnpm install --frozen-lockfile`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own. New migrations apply only with `OXYBOOK_MIGRATE_ON_START=true` in `.env` or `pnpm db:migrate`.
@@ -72,7 +73,7 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | --- | --- |
 | M0 — Foundations and risk spikes | complete |
 | M1 — Read path and published site | complete |
-| M2 — Editor and write path | in progress |
+| M2 — Editor and write path | complete |
 | M3 — Conflicts, versions, renames | not started |
 | M4 — Production readiness, v1.0 | not started |
 
@@ -104,19 +105,21 @@ Still unverified. These are not the exit sentence, and they are not done:
 3. **A dropped webhook is caught by reconciliation.** Met. Advancing `main` to `b8058130b7d5a9da6dc0646bf29e15fce32b3d58` ([oxybook-test#5](https://github.com/crisprintsstuff/oxybook-test/pull/5)) without a webhook is detected by `reconcile` (`stored b604ea37c22c, remote b8058130b7d5`), which queues `sync` (`+0 ~1 -0`) and chains `build` (`e72b3fcf-25a8-41e2-82d1-f2e5d3a95fc9`, 9 of 10 pages cached), updating `/test-page` on the published site.
 4. **Stopping `app` does not take the published site down.** Met. With `app` and `worker` stopped (`ECONNREFUSED` on `app`'s `/healthz`), Caddy (`Server: Caddy` on port `8180`) continues serving `/`, `/getting-started`, `/guides/configure`, `/reference/commands`, `/reference/cli` (redirect), `/test-page`, `/guides/images/stack.svg`, `/pagefind/pagefind-entry.json` (all `200`), and `/placeholder` (`404`) on `http://test.docs.localhost:8180`.
 
-## M2 next
+## M2 exit, met
 
-In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages/doc-model` editor document model and dirty-block bridge) is done. Slice 2 (drafts, `If-Match` concurrency, diff preview, multi-file commits, and 3-way rebase) is done. Slice 3 (propose, Sign in with GitHub) is done. Slices 4a (the editor API) and 4b (the editor UI, source mode) are done; next is 4c. Scope from `docs/MVP.md`:
+`docs/MVP.md` says M2 is done when an end-to-end test edits one paragraph in an `.mdx` page containing JSX components, raw HTML and unusual frontmatter, and the resulting PR diff touches only that paragraph's lines; a non-GitHub user can propose a change that a GitHub user then merges, and the site updates. Measured with `pnpm m2:exit cris/test` on the owner's machine on 2026-11-01 (run `2026-11-01-5da7f7`, 24 seconds end to end), against `crisprintsstuff/oxybook-test`:
 
-- Editor SPA (`apps/editor`): page tree, TipTap editor for the ARCHITECTURE §3.2 constructs, raw block/inline NodeViews, source mode (CodeMirror 6), metadata panel, image upload, link picker inserting relative paths, in-editor preview through the renderer. *Editor document schema, raw nodes, and metadata panel model are in `packages/doc-model` (slice 1); the browser SPA is slice 4.*
-- Dirty-block tracking via step maps; serializer integration. *Done in `packages/doc-model` (`editor-doc.ts`, slice 1).*
-- Drafts with autosave and optimistic concurrency; diff preview; propose / update PR; app-authored vs user-authored PRs; DCO trailer option; path and branch guards in the worker. *Drafts, autosave concurrency, diff preview, the DCO option, and path guards are done (slice 2). Propose/update PR and app- vs user-authored PRs are slice 3.*
-- Editor and Viewer roles; Sign in with GitHub. *Done (slice 3): propose needs editor or admin; Sign in with GitHub, linking, and user-authored PRs checked live.*
-- Clean-merge handling when the base moved; conflicting drafts routed to GitHub/source mode. *Done (slice 2): `rebaseDrafts` runs after every sync that moves the head; the conflict view is slice 4.*
-
-**Done when:** an end-to-end test edits one paragraph in an `.mdx` page containing JSX components, raw HTML and unusual frontmatter, and the resulting PR diff touches only that paragraph's lines; a non-GitHub user can propose a change that a GitHub user then merges, and the site updates.
+1. **One paragraph edited in an `.mdx` page with JSX, raw HTML, and unusual frontmatter; the PR diff touches only that paragraph's lines.** Met. The fixture `docs/m2-exit.mdx` (a `<Tabs>` component, a raw `<div>` block, frontmatter with a comment, a flow list, and a block scalar) was added by [oxybook-test#8](https://github.com/crisprintsstuff/oxybook-test/pull/8). The edit, [oxybook-test#9](https://github.com/crisprintsstuff/oxybook-test/pull/9), changes one file, `docs/m2-exit.mdx`, +1/−1: the marker paragraph's one line, checked by the script and again from this session through the GitHub API.
+2. **A non-GitHub user proposes.** Met. The proposer, `m2-exit-writer@example.com`, has no linked GitHub account; it edited and proposed through the editor API, and the PR's author is `oxybook-cris[bot]`.
+3. **A GitHub user merges.** Met. #9 was merged by `crisprintsstuff`, with that account's linked token (merge `02ae86104fa2`).
+4. **The site updates.** Met. `/m2-exit` on the published site showed the new paragraph 4 seconds after the merge, from the push webhook with no manual sync, and the draft moved to `merged` from the `pull_request` webhook.
 
 ## Changelog
+
+### 2026-11-01 — M2 complete: `pnpm m2:exit` passed on the owner's machine
+
+- Run `2026-11-01-5da7f7` by the owner with `pnpm dev` and compose Caddy, after #38. The first run added the fixture by [oxybook-test#8](https://github.com/crisprintsstuff/oxybook-test/pull/8), merged and synced. The edit, [oxybook-test#9](https://github.com/crisprintsstuff/oxybook-test/pull/9), was App-authored, +1/−1 on `docs/m2-exit.mdx`, and merged by `crisprintsstuff`. The site showed it 4 seconds later through the push webhook, and the draft was marked `merged`. Details are under "M2 exit, met".
+- Checked from this session through the GitHub API: #9's author `oxybook-cris[bot]`, `merged_by` `crisprintsstuff`, one file, and a patch whose only `-`/`+` lines are the marker paragraph.
 
 ### 2026-11-01 — M2 slice 5: `pnpm m2:exit`
 
