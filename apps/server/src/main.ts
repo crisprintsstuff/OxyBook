@@ -14,10 +14,11 @@ import {
   saveAppCredentials,
 } from '@oxybook/db';
 import { type AppCredentials, MemoryAppCredentials } from '@oxybook/github';
-import { startJobs, syncKey } from '@oxybook/jobs';
+import { type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
 import { runSpaceBuild } from '@oxybook/renderer';
 import { runSpaceSync, storedAppTokens } from '@oxybook/sync';
 import { type Delivery, handleDelivery, pruneDeliveries } from './deliveries.js';
+import { createEditorApi } from './editor-api.js';
 import { createGithubRoutes } from './github-routes.js';
 import { createUiRoutes, type UiRouteOptions } from './ui-routes.js';
 
@@ -70,6 +71,11 @@ function closeServer(server: Server): Promise<void> {
   });
 }
 
+/** UI route options, plus the job queue the editor API sends propose jobs to. */
+export type AppUiOptions = Omit<UiRouteOptions, 'publicUrl' | 'store'> & {
+  jobs?: Pick<JobQueue, 'send'>;
+};
+
 export function startAppServer(options: {
   port: number;
   host?: string;
@@ -77,7 +83,7 @@ export function startAppServer(options: {
   store?: MemoryAppCredentials;
   persist?: (credentials: AppCredentials) => Promise<void>;
   onDelivery?: (delivery: Delivery) => Promise<void>;
-  ui?: Omit<UiRouteOptions, 'publicUrl' | 'store'>;
+  ui?: AppUiOptions;
 }): Promise<HealthServer> {
   const publicUrl =
     options.publicUrl ?? process.env.OXYBOOK_PUBLIC_URL ?? 'http://app.localhost:8080';
@@ -102,9 +108,18 @@ export function startAppServer(options: {
         store: github.store,
       })
     : null;
+  const editor = options.ui
+    ? createEditorApi({
+        db: options.ui.db,
+        secretKey: options.ui.secretKey,
+        ...(options.ui.jobs ? { jobs: options.ui.jobs } : {}),
+        ...(options.ui.now ? { now: options.ui.now } : {}),
+      })
+    : null;
   const server = createServer(async (request, response) => {
     const rawBody = await readRawBody(request);
     if (await github.handle(request, response, rawBody)) return;
+    if (editor && (await editor.handle(request, response, rawBody))) return;
     if (ui && (await ui.handle(request, response, rawBody))) return;
     const url = request.url?.split('?')[0];
     if (request.method === 'GET' && url === '/healthz') {
@@ -243,7 +258,7 @@ export async function deliveryHandlerFromEnv(
 export async function uiFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   log: (line: string) => void = console.log,
-): Promise<Omit<UiRouteOptions, 'publicUrl' | 'store'> | undefined> {
+): Promise<AppUiOptions | undefined> {
   if (!env.DATABASE_URL) return undefined;
   const db: Kysely<Database> = createDb(env.DATABASE_URL, { max: 4 });
   const jobs = await startJobs(env.DATABASE_URL, { log });
@@ -255,6 +270,7 @@ export async function uiFromEnv(
 
   return {
     db,
+    jobs,
     ...(env.OXYBOOK_SECRET_KEY ? { secretKey: env.OXYBOOK_SECRET_KEY } : {}),
     sitesDomain,
     ...(env.CADDY_PORT ? { sitesPort: env.CADDY_PORT } : {}),
