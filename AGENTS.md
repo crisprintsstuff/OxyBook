@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs), and slice 4 (the editor: API, source mode, visual mode) are done; slice 5's `pnpm m2:exit` is written and waits for a run on the owner's machine. Releases are tags (`docs/RELEASING.md`); `v0.1.0` is out. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0, M1, and M2 are complete (`pnpm m1:exit` and `pnpm m2:exit` measured each exit sentence on the owner's machine). M2 (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs), and slice 4 (the editor: API, source mode, visual mode) are done; slice 5's `pnpm m2:exit` passed. Next is M3, which needs a plan first. Releases are tags (`docs/RELEASING.md`); `v0.1.0` is out. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
