@@ -15,6 +15,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 7. `docs/LIVE-INSTALL.md` — the owner's checklist for a live GitHub App created from `/setup/github`. Run once on 2026-10-30; results are in `STATUS.md`.
 8. `docs/M1-PLAN.md` — M1 scope in order. A plan, not a record.
 9. `docs/M1-NOTES.md` — M1 measurements: the H3 compatibility report and the component list it recommends.
+10. `docs/M3-PLAN.md` — M3 scope in order (conflicts, renames, versions, ordering). A plan, not a record.
 
 ## Hard constraints
 
@@ -27,7 +28,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0, M1, and M2 are complete (`pnpm m1:exit` and `pnpm m2:exit` measured each exit sentence on the owner's machine). M2 (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs), and slice 4 (the editor: API, source mode, visual mode) are done; slice 5's `pnpm m2:exit` passed. Next is M3, which needs a plan first. Releases are tags (`docs/RELEASING.md`); `v0.1.0` is out. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0, M1, and M2 are complete (`pnpm m1:exit` and `pnpm m2:exit` measured each exit sentence on the owner's machine). M2 (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs), and slice 4 (the editor: API, source mode, visual mode) are done; slice 5's `pnpm m2:exit` passed. M3 is planned in `docs/M3-PLAN.md`. Releases are tags (`docs/RELEASING.md`); `v0.1.0` is out. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
