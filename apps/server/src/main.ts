@@ -23,6 +23,9 @@ import { createEditorAssets } from './editor-assets.js';
 import { createGithubRoutes } from './github-routes.js';
 import { createUiRoutes, type UiRouteOptions } from './ui-routes.js';
 
+/** Set in release images (Dockerfile `OXYBOOK_VERSION`); `dev` everywhere else. */
+export const OXYBOOK_VERSION = process.env.OXYBOOK_VERSION || 'dev';
+
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
 export interface HealthServer {
@@ -38,7 +41,7 @@ export function startHealthServer(options: {
   const server = createServer((request, response) => {
     const url = request.url?.split('?')[0];
     if (request.method === 'GET' && url === '/healthz') {
-      const body = JSON.stringify({ ok: true, service: options.service });
+      const body = JSON.stringify({ ok: true, service: options.service, version: OXYBOOK_VERSION });
       response.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'content-length': Buffer.byteLength(body),
@@ -130,7 +133,7 @@ export function startAppServer(options: {
     if (ui && (await ui.handle(request, response, rawBody))) return;
     const url = request.url?.split('?')[0];
     if (request.method === 'GET' && url === '/healthz') {
-      const body = JSON.stringify({ ok: true, service: 'app' });
+      const body = JSON.stringify({ ok: true, service: 'app', version: OXYBOOK_VERSION });
       response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
       response.end(body);
       return;
@@ -335,7 +338,7 @@ if (invokedDirectly()) {
       });
     })
     .then(({ port: bound }) => {
-      console.log(`app listening on ${bound}`);
+      console.log(`app listening on ${bound} (OxyBook ${OXYBOOK_VERSION})`);
     })
     .catch((error: unknown) => {
       console.error(error);

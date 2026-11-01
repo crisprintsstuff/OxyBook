@@ -21,6 +21,10 @@ RUN apt-get update \
   && git --version
 WORKDIR /app
 COPY --from=build /src /app
+# The release workflow passes the tag's version; /healthz and the startup log report it.
+ARG OXYBOOK_VERSION=dev
+ENV OXYBOOK_VERSION=$OXYBOOK_VERSION
+LABEL org.opencontainers.image.source="https://github.com/crisprintsstuff/OxyBook"
 COPY deploy/oxybook /usr/local/bin/oxybook
 RUN chmod 755 /usr/local/bin/oxybook \
   && chown -R node:node /app

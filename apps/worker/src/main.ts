@@ -20,6 +20,9 @@ import {
   type UserGithub,
 } from '@oxybook/sync';
 
+/** Set in release images (Dockerfile `OXYBOOK_VERSION`); `dev` everywhere else. */
+export const OXYBOOK_VERSION = process.env.OXYBOOK_VERSION || 'dev';
+
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
 export interface HealthServer {
@@ -35,7 +38,7 @@ export function startHealthServer(options: {
   const server = createServer((request, response) => {
     const url = request.url?.split('?')[0];
     if (request.method === 'GET' && url === '/healthz') {
-      const body = JSON.stringify({ ok: true, service: options.service });
+      const body = JSON.stringify({ ok: true, service: options.service, version: OXYBOOK_VERSION });
       response.writeHead(200, {
         'content-type': 'application/json; charset=utf-8',
         'content-length': Buffer.byteLength(body),
@@ -369,7 +372,7 @@ if (invokedDirectly()) {
   const port = Number(process.env.HEALTH_PORT ?? 3001);
   startHealthServer({ port, service: 'worker' })
     .then(async ({ port: bound }) => {
-      console.log(`worker listening on ${bound}`);
+      console.log(`worker listening on ${bound} (OxyBook ${OXYBOOK_VERSION})`);
       if (!process.env.DATABASE_URL) {
         console.log('jobs: off (DATABASE_URL is not set)');
         return;

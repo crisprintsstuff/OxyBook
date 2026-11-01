@@ -10,7 +10,7 @@ describe('app health', () => {
     try {
       const health = await fetch(`http://127.0.0.1:${server.port}/healthz`);
       assert.equal(health.status, 200);
-      assert.deepEqual(await health.json(), { ok: true, service: 'app' });
+      assert.deepEqual(await health.json(), { ok: true, service: 'app', version: 'dev' });
       const missing = await fetch(`http://127.0.0.1:${server.port}/`);
       assert.equal(missing.status, 404);
     } finally {

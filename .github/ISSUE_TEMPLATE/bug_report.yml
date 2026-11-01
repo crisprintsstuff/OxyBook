@@ -50,8 +50,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: OxyBook commit
-      description: Output of `git rev-parse --short HEAD` in your clone.
+      label: OxyBook version
+      description: The release (the `version` in `curl -s http://app.localhost:8080/healthz`), or `git rev-parse --short HEAD` if you run from source.
     validations:
       required: true
   - type: input
