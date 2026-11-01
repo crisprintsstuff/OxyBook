@@ -213,7 +213,12 @@ export async function runM1Exit(
       .executeTakeFirst();
     const installationId = existingSpace?.github_installation_id
       ? Number(existingSpace.github_installation_id)
-      : Number(env.GITHUB_APP_INSTALLATION_ID ?? 176737174);
+      : Number(env.GITHUB_APP_INSTALLATION_ID);
+    if (!Number.isSafeInteger(installationId) || installationId <= 0) {
+      throw new Error(
+        'no installation id: connect crisprintsstuff/oxybook-test as a space first, or set GITHUB_APP_INSTALLATION_ID',
+      );
+    }
 
     log(
       `[0/4] Loaded GitHub App ${storedApp.slug} (${storedApp.id}), installation ${installationId} on crisprintsstuff/oxybook-test`,

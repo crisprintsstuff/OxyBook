@@ -67,7 +67,7 @@ describe('accounts, sessions, roles, and UI/API repo connection', {
       name: 'CLI Space',
       owner: 'crisprintsstuff',
       repo: 'oxybook-test',
-      installationId: 176737174,
+      installationId: 7654321,
       contentRoot: 'docs',
       defaultRef: 'main',
     });
@@ -143,7 +143,7 @@ describe('accounts, sessions, roles, and UI/API repo connection', {
   it('runs the full HTTP signup, CSRF check, org creation, §4.1 repo access check, space creation, role checks, and logout', async () => {
     const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
     await saveAppCredentials(db, deriveSecretsKey(secretKey), {
-      id: 5535294,
+      id: 1234567,
       slug: 'oxybook-cris',
       clientId: 'cid',
       clientSecret: 'csecret',
@@ -159,11 +159,11 @@ describe('accounts, sessions, roles, and UI/API repo connection', {
 
       if (u.endsWith('/app/installations?per_page=100')) {
         return new Response(
-          JSON.stringify([{ id: 176737174, account: { login: 'crisprintsstuff' } }]),
+          JSON.stringify([{ id: 7654321, account: { login: 'crisprintsstuff' } }]),
           { status: 200 },
         );
       }
-      if (u.endsWith('/app/installations/176737174/access_tokens')) {
+      if (u.endsWith('/app/installations/7654321/access_tokens')) {
         return new Response(
           JSON.stringify({
             token: 'ghs_installation_token',
@@ -190,7 +190,7 @@ describe('accounts, sessions, roles, and UI/API repo connection', {
       }
       if (u.endsWith('/repos/crisprintsstuff/oxybook-test/installation')) {
         return new Response(
-          JSON.stringify({ id: 176737174, account: { login: 'crisprintsstuff' } }),
+          JSON.stringify({ id: 7654321, account: { login: 'crisprintsstuff' } }),
           { status: 200 },
         );
       }
@@ -352,7 +352,7 @@ describe('accounts, sessions, roles, and UI/API repo connection', {
         space: { id: string; installationId: number; contentRoot: string };
         sync: { synced?: boolean; built?: boolean };
       };
-      assert.equal(createdSpaceBody.space.installationId, 176737174);
+      assert.equal(createdSpaceBody.space.installationId, 7654321);
       assert.equal(syncedSpaces.length, 1);
       assert.equal(syncedSpaces[0]?.spaceId, createdSpaceBody.space.id);
       assert.equal(syncedSpaces[0]?.syncNow, true);

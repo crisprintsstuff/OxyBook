@@ -39,7 +39,7 @@ describe('webhook deliveries', { skip: url ? false : 'DATABASE_URL is not set' }
         name: 'S',
         repo_owner: 'crisprintsstuff',
         repo_name: 'oxybook-test',
-        github_installation_id: 176737174,
+        github_installation_id: 7654321,
         default_ref: 'main',
       })
       .returning('id')

@@ -26,9 +26,9 @@ describe('findRepoInstallation', () => {
         owner: 'crisprintsstuff',
         repo: 'oxybook-test',
         appJwt: 'jwt',
-        fetch: fake(200, { id: 176737174, account: { login: 'crisprintsstuff' } }),
+        fetch: fake(200, { id: 7654321, account: { login: 'crisprintsstuff' } }),
       }),
-      { id: 176737174, account: 'crisprintsstuff' },
+      { id: 7654321, account: 'crisprintsstuff' },
     );
     assert.equal(
       requests[0]?.url,
@@ -98,7 +98,7 @@ describe('checkUserRepoAccess and checkInstallationRepoAccess', () => {
       const s = String(url);
       if (s.endsWith('/app/installations?per_page=100')) {
         return new Response(
-          JSON.stringify([{ id: 176737174, account: { login: 'crisprintsstuff' } }]),
+          JSON.stringify([{ id: 7654321, account: { login: 'crisprintsstuff' } }]),
           { status: 200 },
         );
       }
@@ -128,7 +128,7 @@ describe('checkUserRepoAccess and checkInstallationRepoAccess', () => {
     });
     assert.deepEqual(repos, [
       {
-        installationId: 176737174,
+        installationId: 7654321,
         account: 'crisprintsstuff',
         owner: 'crisprintsstuff',
         repo: 'oxybook-test',

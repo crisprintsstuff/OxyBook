@@ -33,7 +33,7 @@ describe('linked user tokens', { skip: url ? false : 'DATABASE_URL is not set' }
     db = createDb(url as string, { max: 2, searchPath: schema });
     await migrateToLatest(db, { schema });
     await saveAppCredentials(db, key, {
-      id: 5535294,
+      id: 1234567,
       slug: 'oxybook-cris',
       clientId: 'Iv1.client',
       clientSecret: 'client-secret',
