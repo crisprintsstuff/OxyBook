@@ -277,3 +277,56 @@ export function relativeLink(fromPath: string, toPath: string): string {
   const up = from.length - shared;
   return [...Array(up).fill('..'), ...to.slice(shared)].join('/');
 }
+
+/** A span of a conflicted file (packages/drafts merge3): merged on its own, or a conflict. */
+export type ConflictRegion =
+  | { kind: 'same'; text: string }
+  | { kind: 'mine' | 'theirs' | 'both'; text: string; base: string }
+  | { kind: 'conflict'; base: string; mine: string; theirs: string };
+
+export type RegionChoice = 'mine' | 'theirs' | { text: string };
+
+export interface FileConflict {
+  path: string;
+  oldPath: string | null;
+  op: FileOp;
+  code: string;
+  why: string;
+  kind: 'regions' | 'choice';
+  regions: ConflictRegion[] | null;
+  conflicts: number;
+  choices: ('keep-mine' | 'take-theirs')[];
+  mine: string | null;
+  theirs: string | null;
+}
+
+export interface ConflictView {
+  draftId: string;
+  version: number;
+  head: string;
+  files: FileConflict[];
+}
+
+/** The merged file for one choice per conflict region (null while any is missing). */
+export function resolvedText(
+  regions: readonly ConflictRegion[],
+  choices: readonly (RegionChoice | undefined)[],
+): string | null {
+  let out = '';
+  let i = 0;
+  for (const region of regions) {
+    if (region.kind !== 'conflict') {
+      out += region.text;
+      continue;
+    }
+    const choice = choices[i++];
+    if (choice === undefined) return null;
+    out += choice === 'mine' ? region.mine : choice === 'theirs' ? region.theirs : choice.text;
+  }
+  return out;
+}
+
+/** A region's text without the blank lines that separate it from the block before. */
+export function displayBlock(text: string): string {
+  return text.replace(/^(\r?\n)+/, '');
+}

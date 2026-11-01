@@ -8,9 +8,11 @@ import {
   type DraftSummary,
   describeWarning,
   diffLines,
+  displayBlock,
   newPagePath,
   newPageSource,
   relativeLink,
+  resolvedText,
   routeFromPath,
   type TreePage,
   uploadTarget,
@@ -133,5 +135,21 @@ describe('editor model', () => {
     assert.equal(relativeLink('docs/index.md', 'docs/guides/deep/a.mdx'), 'guides/deep/a.mdx');
     assert.equal(relativeLink('docs/guides/deep/a.md', 'docs/index.md'), '../../index.md');
     assert.equal(relativeLink('README.md', 'docs/a.md'), 'docs/a.md');
+  });
+
+  it('builds a resolved file from per-conflict choices', () => {
+    const regions = [
+      { kind: 'same' as const, text: 'alpha' },
+      { kind: 'conflict' as const, base: '\n\nbeta', mine: '\n\nbeta m', theirs: '\n\nbeta t' },
+      { kind: 'theirs' as const, text: '\n\ngamma t', base: '\n\ngamma' },
+      { kind: 'conflict' as const, base: '\n\nd', mine: '\n\nd m', theirs: '\n\nd t' },
+      { kind: 'same' as const, text: '\n' },
+    ];
+    assert.equal(resolvedText(regions, ['mine']), null);
+    assert.equal(
+      resolvedText(regions, ['theirs', { text: '\n\nd both' }]),
+      'alpha\n\nbeta t\n\ngamma t\n\nd both\n',
+    );
+    assert.equal(displayBlock('\r\n\r\nbeta'), 'beta');
   });
 });

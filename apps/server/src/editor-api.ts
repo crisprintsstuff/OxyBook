@@ -5,16 +5,20 @@ import type { Database, Kysely } from '@oxybook/db';
 import {
   type BlobSource,
   type Draft,
+  DraftHeadMoved,
   DraftInputError,
   DraftStateError,
   DraftVersionConflict,
   discardDraft,
+  draftConflicts,
   draftDiff,
+  type FileResolution,
   findOpenDraft,
   listDraftFiles,
   openDraft,
   openDraftsTouching,
   removeDraftFile,
+  resolveDraft,
   saveDraftFile,
   spaceRoleOf,
 } from '@oxybook/drafts';
@@ -127,6 +131,72 @@ function dbBlobs(db: Kysely<Database>, orgId: string): BlobSource {
       throw new Error('not available in the app');
     },
   };
+}
+
+/**
+ * The space's files at its synced head, from the read model, for the conflict view.
+ * Pages are all there; a conflict on any other file (an image, `oxybook.yml`) is
+ * resolved on GitHub or by discarding, because the app holds no git mirror.
+ */
+function headBlobs(
+  db: Kysely<Database>,
+  space: { id: string; orgId: string; ref: string; contentRoot: string },
+): BlobSource {
+  const base = dbBlobs(db, space.orgId);
+  return {
+    blob: base.blob,
+    async at(commit, path) {
+      const state = await db
+        .selectFrom('ref_state')
+        .select('head_sha')
+        .where('space_id', '=', space.id)
+        .where('ref', '=', space.ref)
+        .executeTakeFirst();
+      if (state?.head_sha !== commit)
+        throw new HttpError(409, 'the space is syncing; reload in a moment');
+      const root = space.contentRoot ? `${space.contentRoot}/` : '';
+      if (!path.startsWith(root) || !/\.mdx?$/i.test(path))
+        throw new HttpError(
+          409,
+          `${path} is not a page, so its conflict cannot be shown here; resolve it on GitHub or discard the draft`,
+        );
+      const row = await db
+        .selectFrom('pages')
+        .innerJoin('blobs', (join) =>
+          join.onRef('blobs.org_id', '=', 'pages.org_id').onRef('blobs.sha', '=', 'pages.blob_sha'),
+        )
+        .select(['pages.blob_sha as sha', 'blobs.bytes as bytes'])
+        .where('pages.space_id', '=', space.id)
+        .where('pages.ref', '=', space.ref)
+        .where('pages.path', '=', path.slice(root.length))
+        .executeTakeFirst();
+      return row ?? null;
+    },
+  };
+}
+
+function resolutions(value: unknown): FileResolution[] {
+  if (!Array.isArray(value)) throw new HttpError(400, 'resolutions must be a list');
+  return value.map((item) => {
+    if (!item || typeof item !== 'object')
+      throw new HttpError(400, 'a resolution must be an object');
+    const r = item as Record<string, unknown>;
+    if (typeof r.path !== 'string') throw new HttpError(400, 'a resolution needs a path');
+    if (r.take === 'keep-mine' || r.take === 'take-theirs') return { path: r.path, take: r.take };
+    if (typeof r.content === 'string')
+      return { path: r.path, bytes: Buffer.from(r.content, 'utf8') };
+    if (Array.isArray(r.choices))
+      return {
+        path: r.path,
+        choices: r.choices.map((c) => {
+          if (c === 'mine' || c === 'theirs') return c;
+          if (c && typeof c === 'object' && typeof (c as { text?: unknown }).text === 'string')
+            return { text: (c as { text: string }).text };
+          throw new HttpError(400, 'a choice is "mine", "theirs", or { text }');
+        }),
+      };
+    throw new HttpError(400, `${r.path}: give take, choices, or content`);
+  });
 }
 
 export function createEditorApi(options: EditorApiOptions) {
@@ -336,6 +406,21 @@ export function createEditorApi(options: EditorApiOptions) {
       return;
     }
 
+    if (method === 'GET' && action === 'draft/conflicts') {
+      const draft = await ownDraft(ctx);
+      if (draft.state !== 'conflicted') {
+        sendJson(response, 200, {
+          draftId: draft.id,
+          version: draft.version,
+          head: ctx.space.head,
+          files: [],
+        });
+        return;
+      }
+      sendJson(response, 200, await draftConflicts(db, draft.id, headBlobs(db, ctx.space)));
+      return;
+    }
+
     // Everything below writes.
     requireWrite(request, ctx);
 
@@ -392,8 +477,26 @@ export function createEditorApi(options: EditorApiOptions) {
       return;
     }
 
+    if (method === 'POST' && action === 'draft/resolve') {
+      const draft = await ownDraft(ctx);
+      const body = jsonBody(rawBody);
+      const resolved = await resolveDraft(db, {
+        draftId: draft.id,
+        ifMatch: ifMatch(request),
+        head: str(body.head, 'head'),
+        source: headBlobs(db, ctx.space),
+        resolutions: resolutions(body.resolutions),
+      });
+      sendJson(response, 200, {
+        draft: draftSummary(resolved, await listDraftFiles(db, resolved.id)),
+      });
+      return;
+    }
+
     if (method === 'POST' && action === 'draft/propose') {
       const draft = await ownDraft(ctx);
+      if (draft.state === 'conflicted')
+        throw new HttpError(409, 'the draft has conflicts with new commits; resolve them first');
       if (!options.jobs)
         throw new HttpError(503, 'proposing needs the job queue (DATABASE_URL on the app)');
       const body = jsonBody(rawBody);
@@ -456,6 +559,8 @@ export function createEditorApi(options: EditorApiOptions) {
           sendJson(response, 409, { error: error.message, state: error.state });
         else if (error instanceof DraftInputError)
           sendJson(response, 400, { error: error.message });
+        else if (error instanceof DraftHeadMoved)
+          sendJson(response, 409, { error: error.message, head: error.current });
         else throw error;
       }
       return true;
