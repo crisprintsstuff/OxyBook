@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export {
+  type ConflictChoice,
+  type DraftConflicts,
+  DraftHeadMoved,
+  draftConflicts,
+  type FileConflict,
+  type FileResolution,
+  resolveDraft,
+} from './conflicts.js';
+export {
   type Draft,
   type DraftFile,
   DraftInputError,
@@ -18,6 +27,14 @@ export {
   saveDraftFile,
 } from './drafts.js';
 export {
+  conflictCount,
+  type MergeRegion,
+  mergeText,
+  mergeUnitLists,
+  type RegionChoice,
+  resolveRegions,
+} from './merge3.js';
+export {
   applyPullRequestEvent,
   assertCanPropose,
   draftBranch,
@@ -32,6 +49,7 @@ export {
 } from './propose.js';
 export {
   type BlobSource,
+  type ConflictCode,
   draftDiff,
   type FileDiff,
   type RebaseOutcome,

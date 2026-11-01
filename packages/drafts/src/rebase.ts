@@ -83,24 +83,39 @@ export async function draftDiff(
   return diffs;
 }
 
-type Decision =
+/** Why a drafted file cannot follow the base on its own. */
+export type ConflictCode =
+  | 'content'
+  | 'binary'
+  | 'add-add'
+  | 'deleted-upstream'
+  | 'edited-upstream'
+  | 'rename-target-exists'
+  | 'rename-source-gone';
+
+export type Decision =
   | { kind: 'keep' }
   | { kind: 'drop'; why: string }
   | { kind: 'update'; bytes: Buffer; baseBlobSha: string }
-  | { kind: 'conflict'; why: string };
+  | {
+      kind: 'conflict';
+      why: string;
+      code: ConflictCode;
+      /** The file at the new head, when it exists there. */
+      upstream: { sha: string; bytes: Buffer } | null;
+    };
 
-async function decide(file: DraftFile, head: string, source: BlobSource): Promise<Decision> {
+/** What happens to one drafted file when the base moves to `head` (ARCHITECTURE §4.5). */
+export async function decide(file: DraftFile, head: string, source: BlobSource): Promise<Decision> {
   const draftBytes = file.bytes ?? Buffer.alloc(0);
   const mergeOnto = async (upstream: { sha: string; bytes: Buffer }): Promise<Decision> => {
     if (upstream.sha === file.baseBlobSha) return { kind: 'keep' };
     const base = await source.blob(file.baseBlobSha as string);
     const merged = mergeFile3(base, draftBytes, upstream.bytes);
     if (!merged.clean) {
-      return {
-        kind: 'conflict',
-        why:
-          merged.reason === 'binary' ? 'binary file changed upstream too' : 'edited upstream too',
-      };
+      return merged.reason === 'binary'
+        ? { kind: 'conflict', why: 'binary file changed upstream too', code: 'binary', upstream }
+        : { kind: 'conflict', why: 'edited upstream too', code: 'content', upstream };
     }
     if (merged.bytes.equals(upstream.bytes))
       return { kind: 'drop', why: 'the same change landed upstream' };
@@ -112,24 +127,52 @@ async function decide(file: DraftFile, head: string, source: BlobSource): Promis
       if (!upstream) return { kind: 'keep' };
       if (upstream.bytes.equals(draftBytes))
         return { kind: 'drop', why: 'the same file was added upstream' };
-      return { kind: 'conflict', why: 'a different file was added upstream at this path' };
+      return {
+        kind: 'conflict',
+        why: 'a different file was added upstream at this path',
+        code: 'add-add',
+        upstream,
+      };
     }
     case 'modify': {
       const upstream = await source.at(head, file.path);
-      if (!upstream) return { kind: 'conflict', why: 'deleted upstream, edited in the draft' };
+      if (!upstream)
+        return {
+          kind: 'conflict',
+          why: 'deleted upstream, edited in the draft',
+          code: 'deleted-upstream',
+          upstream: null,
+        };
       return mergeOnto(upstream);
     }
     case 'delete': {
       const upstream = await source.at(head, file.path);
       if (!upstream) return { kind: 'drop', why: 'already deleted upstream' };
       if (upstream.sha === file.baseBlobSha) return { kind: 'keep' };
-      return { kind: 'conflict', why: 'edited upstream, deleted in the draft' };
+      return {
+        kind: 'conflict',
+        why: 'edited upstream, deleted in the draft',
+        code: 'edited-upstream',
+        upstream,
+      };
     }
     case 'rename': {
-      if (await source.at(head, file.path))
-        return { kind: 'conflict', why: 'the new path now exists upstream' };
+      const taken = await source.at(head, file.path);
+      if (taken)
+        return {
+          kind: 'conflict',
+          why: 'the new path now exists upstream',
+          code: 'rename-target-exists',
+          upstream: taken,
+        };
       const upstream = await source.at(head, file.oldPath as string);
-      if (!upstream) return { kind: 'conflict', why: 'the original was deleted or moved upstream' };
+      if (!upstream)
+        return {
+          kind: 'conflict',
+          why: 'the original was deleted or moved upstream',
+          code: 'rename-source-gone',
+          upstream: null,
+        };
       return mergeOnto(upstream);
     }
   }
