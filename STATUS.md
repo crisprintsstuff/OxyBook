@@ -45,7 +45,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
   - **Changes (n)** shows the draft's unified diff. **Propose changes** / **Update pull request** takes a title and an optional DCO sign-off, then polls until the PR link appears or the job records an error.
   - Also: image upload into `images/` next to the page (inserts a relative reference), revert a page, discard the draft. Viewers get the same screen read-only.
 - **Write path (`packages/git-write`):** `commitFiles` builds one commit from any mix of add, modify, delete, and rename, using a temporary index on the bare mirror. Its guards: content root or `oxybook.yml` only, never a hidden path (`.github/workflows` included), a size limit, and one op per path consistent with the base. It adds a DCO trailer only when asked. `mergeFile3` wraps `git merge-file`. Nothing pushes these commits yet (slice 3). The M0 `oxybook-dev propose` CLI pushes a single file to `oxybook/*` with `--force-with-lease` and opens a pull request. It opened oxybook-test#1 (hand-made App) and #2 (manifest-created App), each with a diff of exactly one file. Signed-commit ruleset behaviour is in `docs/M0-GITHUB-SPIKE.md`.
-- **Running it:** on the owner's machine, `pnpm dev` runs app and worker on the host (`PORT=3100`, `HEALTH_PORT=3101`, because Grafana holds 3000), with compose `postgres` and `caddy` (`CADDY_PORT=8180`, because qBittorrent holds 8080) and a Cloudflare tunnel `oxybook.boznetwork.com` → `localhost:3100`. Host processes read the repo `.env`. The container image (`docker compose up --build`) also starts and migrates. Steps are in `docs/LIVE-INSTALL.md`.
+- **Running it:** on the owner's machine, `pnpm dev` runs app and worker on the host (`PORT=3100`, `HEALTH_PORT=3101`, because Grafana holds 3000), with compose `postgres` and `caddy` (`CADDY_PORT=8180`, because qBittorrent holds 8080) and a Cloudflare tunnel `oxybook.example.com` → `localhost:3100`. Host processes read the repo `.env`. The container image (`docker compose up --build`) also starts and migrates. Steps are in `docs/LIVE-INSTALL.md`.
 - **CI:** `.github/workflows/ci.yml` starts `postgres:17` and runs lint, typecheck, test, `db:migrate`, and `test:corpus`. Database test files run one at a time (see M1-NOTES.md, sharp edge). Results are on the Actions tab.
 - **What does not exist:** the visual (TipTap) editor and metadata panel (slice 4c), the link picker, the conflict-resolution view. The source editor highlights YAML frontmatter as markdown. The Git Database API fallback for signed-commit rulesets is unverified on `oxybook-test`. `pnpm test:integration` and `pnpm test:e2e` do not exist. The supported Node is 24; the owner's machine runs 22.23.1 with an engine warning.
 
@@ -57,9 +57,9 @@ For the next session, human or agent.
   - **Try the editor live:** after pulling, `pnpm install --frozen-lockfile` and restart `pnpm dev`, then **Edit pages** on `cris/test` (LIVE-INSTALL.md, "Edit in the browser"). Not yet run on the owner's machine.
   - **M2 slice 4c:** the TipTap visual editor on the `doc-model` bridge, the metadata panel, and the link picker. Then slice 5, `pnpm m2:exit`.
   - **Open on `oxybook-test`:** [#7](https://github.com/crisprintsstuff/oxybook-test/pull/7), the user-authored test PR. Merging it should mark its draft `merged`.
-- **Owner's live setup:** App `oxybook-cris` (App id 5535294, installation 176737174 on `crisprintsstuff/oxybook-test`), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.boznetwork.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
+- **Owner's live setup:** App `oxybook-cris` (App id 5535294, installation 176737174 on `crisprintsstuff/oxybook-test`), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.example.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
 - **After every pull:** `git pull && pnpm install --frozen-lockfile`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own. New migrations apply only with `OXYBOOK_MIGRATE_ON_START=true` in `.env` or `pnpm db:migrate`.
-- **Write path from the CLI:** `pnpm oxybook-admin draft save|show|propose cris/test --user n0eskape@gmail.com …` (see the 2026-10-31 live run).
+- **Write path from the CLI:** `pnpm oxybook-admin draft save|show|propose cris/test --user you@example.com …` (see the 2026-10-31 live run).
 - **Working conventions in this repo:** a branch, then a PR; CI must be green on both the push and the pull_request run before merging. A dated changelog entry goes below for anything measured; write "unverified" when it was not run.
 
 ## Milestones
@@ -174,12 +174,12 @@ Not measured: anything against GitHub. The owner's live steps are in Handoff.
 
 Run by the owner with `pnpm dev` on the host after #26 (`main` at `78f1797`), against `crisprintsstuff/oxybook-test`. Node v22.23.1.
 
-1. `pnpm oxybook-admin draft save cris/test docs/test-page.md --user n0eskape@gmail.com --file /tmp/test-page.md` printed `draft 291ddf98-ce18-4e9c-a281-a8b0ad154547 v2: modify docs/test-page.md`.
+1. `pnpm oxybook-admin draft save cris/test docs/test-page.md --user you@example.com --file /tmp/test-page.md` printed `draft 291ddf98-ce18-4e9c-a281-a8b0ad154547 v2: modify docs/test-page.md`.
 2. `draft show` printed `v2 editing on main@b8058130b7d5` and the unified diff (3 lines out, 1 in).
 3. `draft propose … --title "Edit the test page from a draft"`. The worker logged `draft 291ddf98… proposed (new): oxybook/cris/test-page-291ddf98 at 5e99b73194c9, PR #6 opened`. The `push` webhook for the PR branch was ignored (`no space follows … @oxybook/cris/test-page-291ddf98`), and the `pull_request opened` webhook needed nothing.
 4. Checked from this session through the GitHub API:
    - [oxybook-test#6](https://github.com/crisprintsstuff/oxybook-test/pull/6), user `oxybook-cris[bot]`, head `oxybook/cris/test-page-291ddf98`, base `main`. The files endpoint returned one entry: `docs/test-page.md`, modified, +1/−3.
-   - Commit `5e99b73194c9` has author `cris` with email `<user-id>@users.noreply.oxybook.boznetwork.com` and parent `b8058130b7d5`, the draft's base. The body lists the page and links back to `https://oxybook.boznetwork.com`.
+   - Commit `5e99b73194c9` has author `cris` with email `<user-id>@users.noreply.oxybook.example.com` and parent `b8058130b7d5`, the draft's base. The body lists the page and links back to `https://oxybook.example.com`.
 5. The owner merged #6 (`d2225dc83cf3`, 04:51:38Z). The worker synced and built `d2225dc83cf3`: 10 pages, 9 indexed, 3 warnings. The warnings are exactly the planted `configure.mdx` expression, unknown component, and broken link.
    - `main:docs/test-page.md` now reads `Edited through an OxyBook draft.`
    - `draft show` then printed `no open draft`.
@@ -315,7 +315,7 @@ Base was `main` at `4ec4769b5a865ef15bb144f18465e48cfb4e8625` (CI run `410005087
 Measured on the owner's machine (Node v22.23.1, Compose `postgres` and `caddy`):
 - `pnpm lint`, `pnpm typecheck`, `pnpm build`, and `pnpm test` (with `.env` `DATABASE_URL`) exited 0: 107 unit and integration tests passing across all 11 workspace packages (including new `installations.test.ts` cases in `packages/github` and `auth-ui.test.ts` in `apps/server`).
 - Live end-to-end verification against stored App `oxybook-cris` (`5535294`), real GitHub (`crisprintsstuff/oxybook-test`), and Caddy (`CADDY_PORT=8180`):
-  1. Signed up `cris@boznetwork.com` via `POST /signup` (`303` → `/`, `oxybook_session` cookie set; adopted existing CLI org `cris` as `owner` and space `cris/test` as `admin`).
+  1. Signed up `owner@example.com` via `POST /signup` (`303` → `/`, `oxybook_session` cookie set; adopted existing CLI org `cris` as `owner` and space `cris/test` as `admin`).
   2. Loaded `GET /`, which queried real GitHub as `oxybook-cris` and rendered `<option value="crisprintsstuff/oxybook-test|main">crisprintsstuff/oxybook-test (default branch: main)</option>` in the discovered repositories selector.
   3. Submitted `POST /spaces` (`org_slug=cris`, `slug=ui-test`, `repo=crisprintsstuff/oxybook-test`, `content_root=docs`, `default_ref=main`, `sync_now=true`), which verified installation `176737174` on real GitHub, created space `cris/ui-test`, synced 10 pages at `b8058130b7d5`, built the site (`9 indexed, 3 warnings -> ui-test.docs.localhost`), and redirected (`303`) to `/orgs/cris/spaces/ui-test`.
   4. Stopped the app server and fetched `http://ui-test.docs.localhost:8180/` (`200 OK`, `Server: Caddy`) and `http://ui-test.docs.localhost:8180/pagefind/pagefind-entry.json` (`200 OK`, `"page_count":9`) through Caddy. Cleaned up the temporary `ui-test` space and test user afterwards.
@@ -388,7 +388,7 @@ After #21, the owner restarted `pnpm dev` with `DATABASE_URL` in `.env`. The log
 
 ### 2026-10-30 — Sync on the owner's machine: token, push webhook, reconciliation
 
-Run by the repo owner with `pnpm dev` on the host after #20 (`main` at `d8d100ceaa33cd1bd88c2f8c8dd7c497c7f587f0`). Node v22.23.1, compose `postgres`, tunnel `oxybook.boznetwork.com` → `localhost:3100`.
+Run by the repo owner with `pnpm dev` on the host after #20 (`main` at `d8d100ceaa33cd1bd88c2f8c8dd7c497c7f587f0`). Node v22.23.1, compose `postgres`, tunnel `oxybook.example.com` → `localhost:3100`.
 
 1. **Token path.** `pnpm oxybook-admin sync cris/test` queued a job. The worker logged `job sync 5afb1a27-… (manual)` and `sync 16a7dd2c-… main none..9f6835d1283b: +11 ~0 -0`. So an installation token minted from the stored `oxybook-cris` App fetched the repo.
 2. **Push, no manual step.** The owner merged [oxybook-test#4](https://github.com/crisprintsstuff/oxybook-test/pull/4) (merge commit `b604ea37c22c933f3f4dcf19be2d0e8c1ff34320`, 02:26:37Z). It edits `getting-started.md`, renames `reference/cli.md` to `reference/commands.md` (with the two inbound links updated), and deletes `placeholder.md`. Without anyone running a command, the worker logged `job sync fe847144-… (push 5608407c-d409-11f1-9dfa-4fbc000cc3aa)` and `sync … 9f6835d1283b..b604ea37c22c: +1 ~3 -2 renamed 1 unchanged 6`. `oxybook-admin pages cris/test` then listed 10 pages, synced at 02:26:41.337Z: `/reference/commands` present, `/reference/cli` and `/placeholder` absent. That matches the 10 page files in GitHub's tree at `b604ea3`. `inferred_redirects` held one row: `/reference/cli` → `/reference/commands` at `b604ea37c22c`. The `pull_request` delivery for the same merge was logged as `nothing to do`.
@@ -462,7 +462,7 @@ Not measured: the installation lookup against real GitHub, and any of this on th
 
 ### 2026-10-30 — `push` and `pull_request` webhooks arrive
 
-Merging [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) (`9f6835d1283b8ac01c0603767198e9632754c4fd`) sent two deliveries to the owner's `pnpm dev` server through `oxybook.boznetwork.com`. The server logged both:
+Merging [oxybook-test#3](https://github.com/crisprintsstuff/oxybook-test/pull/3) (`9f6835d1283b8ac01c0603767198e9632754c4fd`) sent two deliveries to the owner's `pnpm dev` server through `oxybook.example.com`. The server logged both:
 
 ```
 webhook verified event=push delivery=bba98dc0-d402-11f1-8d39-50d5d15b54e6
@@ -490,11 +490,11 @@ Tests: `pnpm lint`, `pnpm typecheck`, and `pnpm test` exited 0. `packages/doc-mo
 
 ### 2026-10-30 — Manifest-created App opens a pull request; webhooks arrive
 
-Run by the repo owner on their machine, not in an agent session. `main` was at `74befc218a38d21bcc6c366966e0d65eab9da752` (#14). Node v22.23.1, with the same Unsupported engine warning. `pnpm dev` ran on the host with `PORT=3100` and `HEALTH_PORT=3101`, because Grafana holds 3000. `.env` set `OXYBOOK_PUBLIC_URL=https://oxybook.boznetwork.com` and a generated `OXYBOOK_SECRET_KEY`. `DATABASE_URL` pointed at the compose `postgres` service. The owner's Cloudflare tunnel routes `oxybook.boznetwork.com` to `localhost:3100`.
+Run by the repo owner on their machine, not in an agent session. `main` was at `74befc218a38d21bcc6c366966e0d65eab9da752` (#14). Node v22.23.1, with the same Unsupported engine warning. `pnpm dev` ran on the host with `PORT=3100` and `HEALTH_PORT=3101`, because Grafana holds 3000. `.env` set `OXYBOOK_PUBLIC_URL=https://oxybook.example.com` and a generated `OXYBOOK_SECRET_KEY`. `DATABASE_URL` pointed at the compose `postgres` service. The owner's Cloudflare tunnel routes `oxybook.example.com` to `localhost:3100`.
 
 Server log, in order: `migrated 0001_schema_v0`, `migrated 0002_github_app`, `github app credentials: none stored yet`, `app listening on 3100`. After the browser went through `/setup/github` and GitHub's create page: `github app 5535294 (oxybook-cris) stored in the database`. GitHub then delivered `webhook verified event=ping delivery=02b66b4a-d401-11f1-9340-c19752c9da6b`. Installing on `oxybook-test` (installation id 176737174) delivered `webhook verified event=installation delivery=14595290-d401-11f1-911f-32ef1a4ac8bb`. Before this test the hand-made App's webhook was switched off, so no rejected deliveries were expected.
 
-`oxybook-dev propose /tmp/test-page-2.md ... --path docs/test-page-2.md --draft 2 --draft-url https://oxybook.boznetwork.com/` ran with `GITHUB_APP_ID=5535294`, `GITHUB_APP_INSTALLATION_ID=176737174`, and a second private key generated on the App's settings page. GitHub does not let the key from the manifest exchange be downloaded again, and the CLI does not read the database. It printed commit `2e58f1b9a21b9f0a3df6df9887660bb0f4697b7a`, ref `refs/heads/oxybook/dev/page-2`, base `17d8d47a5b4e8d7feef3ff97054415558d44debc`, and `pr https://github.com/crisprintsstuff/oxybook-test/pull/2`.
+`oxybook-dev propose /tmp/test-page-2.md ... --path docs/test-page-2.md --draft 2 --draft-url https://oxybook.example.com/` ran with `GITHUB_APP_ID=5535294`, `GITHUB_APP_INSTALLATION_ID=176737174`, and a second private key generated on the App's settings page. GitHub does not let the key from the manifest exchange be downloaded again, and the CLI does not read the database. It printed commit `2e58f1b9a21b9f0a3df6df9887660bb0f4697b7a`, ref `refs/heads/oxybook/dev/page-2`, base `17d8d47a5b4e8d7feef3ff97054415558d44debc`, and `pr https://github.com/crisprintsstuff/oxybook-test/pull/2`.
 
 Checked from this session: `GET /repos/crisprintsstuff/oxybook-test/pulls/2` returned open, not merged, user `oxybook-cris[bot]` (type Bot), head `oxybook/dev/page-2`, base `main`. `GET .../pulls/2/files` returned exactly one entry, `docs/test-page-2.md`, added, +3/-0. The commit is unsigned (`verification.verified: false`). `oxybook-test` has no ruleset requiring signatures.
 
@@ -558,7 +558,7 @@ Test repo [crisprintsstuff/oxybook-test](https://github.com/crisprintsstuff/oxyb
 
 The diff is exactly one file, `docs/test-page.md`, added, +3/-0. `GET /repos/crisprintsstuff/oxybook-test/pulls/1/files` returned exactly 1 entry. That is the M0 exit requirement that the diff contain only the intended change.
 
-The pull request body contained `Pages changed: docs/test-page.md` and `Link back: https://oxybook.boznetwork.com`.
+The pull request body contained `Pages changed: docs/test-page.md` and `Link back: https://oxybook.example.com`.
 
 The command was `pnpm oxybook-dev propose <file> --remote https://github.com/crisprintsstuff/oxybook-test.git --github-owner crisprintsstuff --github-repo oxybook-test --installation-id 176643684 --base main --path docs/test-page.md`, with `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY_FILE` set. It exited 0 and printed the commit, the ref, the base, the author, `pr <url>`, and the diff.
 
