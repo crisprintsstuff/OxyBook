@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) has not started.
+- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) is planned in `docs/M3-PLAN.md`; slice 1 (the conflict model) is next.
 - **Last update:** 2026-11-01.
 - **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -58,7 +58,7 @@ For the next session, human or agent.
 - **Resume here:**
   - **Try the editor live:** after pulling, `pnpm install --frozen-lockfile` and restart `pnpm dev`, then **Edit pages** on `cris/test` (LIVE-INSTALL.md, "Edit in the browser"). Not yet run on the owner's machine.
   - **Cut `v0.2.0`** (`docs/RELEASING.md`): M2 is complete.
-  - **M3** (`docs/MVP.md`): the block-level conflict view, versions mapped to branches and tags, renames with redirects and link rewriting. It needs a plan (`docs/M3-PLAN.md`) first.
+  - **M3** (`docs/M3-PLAN.md`): slice 1, the conflict model and `resolveDraft` in `packages/drafts`.
   - **Open on `oxybook-test`:** [#7](https://github.com/crisprintsstuff/oxybook-test/pull/7), the user-authored test PR. Merging it should mark its draft `merged`.
 - **Owner's live setup:** App `oxybook-cris`, installed on `crisprintsstuff/oxybook-test` (its App id and installation id are stored in the database), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.example.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
 - **After every pull:** `git pull && pnpm install --frozen-lockfile`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own. New migrations apply only with `OXYBOOK_MIGRATE_ON_START=true` in `.env` or `pnpm db:migrate`.
@@ -74,7 +74,7 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | M0 — Foundations and risk spikes | complete |
 | M1 — Read path and published site | complete |
 | M2 — Editor and write path | complete |
-| M3 — Conflicts, versions, renames | not started |
+| M3 — Conflicts, versions, renames | in progress (planned) |
 | M4 — Production readiness, v1.0 | not started |
 
 ## M0 exit, met
@@ -115,6 +115,11 @@ Still unverified. These are not the exit sentence, and they are not done:
 4. **The site updates.** Met. `/m2-exit` on the published site showed the new paragraph 4 seconds after the merge, from the push webhook with no manual sync, and the draft moved to `merged` from the `pull_request` webhook.
 
 ## Changelog
+
+### 2026-11-01 — M3 planned
+
+- `docs/M3-PLAN.md`: eight slices. Conflict model and resolution, conflict view in the editor, rename/move with redirects and link patches, inferred redirects committed by PR, versions in sync and build, versions in the editor, `_dir.yml` ordering, and `pnpm m3:exit`. It also records where M2 leaves each area. Nothing is built yet.
+- `v0.2.0` published (pre-release): the visual editor and M2.
 
 ### 2026-11-01 — M2 complete: `pnpm m2:exit` passed on the owner's machine
 

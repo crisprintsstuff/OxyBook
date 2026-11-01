@@ -11,7 +11,7 @@ OxyBook is released as a git tag, a container image, and a GitHub release. `.git
 
 ## Cutting a release
 
-1. `main` is green on CI, and `STATUS.md` matches what is in it.
+1. `main` is green on CI, and `STATUS.md` matches what is in it. Update the README first (its status block, and the example `VERSION` in **Try it**): the tag's README is what the release notes point to.
 2. Tag the `main` commit and push the tag:
 
    ```sh
