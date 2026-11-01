@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) is planned in `docs/M3-PLAN.md`; slice 1 (the conflict model) is next.
+- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) is in progress (`docs/M3-PLAN.md`): slice 1 (the conflict model and `resolveDraft`) is done; slice 2, the conflict view in the editor, is next.
 - **Last update:** 2026-11-01.
 - **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -58,7 +58,7 @@ For the next session, human or agent.
 - **Resume here:**
   - **Try the editor live:** after pulling, `pnpm install --frozen-lockfile` and restart `pnpm dev`, then **Edit pages** on `cris/test` (LIVE-INSTALL.md, "Edit in the browser"). Not yet run on the owner's machine.
   - **Cut `v0.2.0`** (`docs/RELEASING.md`): M2 is complete.
-  - **M3** (`docs/M3-PLAN.md`): slice 1, the conflict model and `resolveDraft` in `packages/drafts`.
+  - **M3** (`docs/M3-PLAN.md`): slice 2, the conflict view in the editor (`GET draft/conflicts`, `POST draft/resolve`, and the resolver UI) on top of slice 1's `draftConflicts` and `resolveDraft`.
   - **Open on `oxybook-test`:** [#7](https://github.com/crisprintsstuff/oxybook-test/pull/7), the user-authored test PR. Merging it should mark its draft `merged`.
 - **Owner's live setup:** App `oxybook-cris`, installed on `crisprintsstuff/oxybook-test` (its App id and installation id are stored in the database), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.example.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
 - **After every pull:** `git pull && pnpm install --frozen-lockfile`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own. New migrations apply only with `OXYBOOK_MIGRATE_ON_START=true` in `.env` or `pnpm db:migrate`.
@@ -74,7 +74,7 @@ From `docs/MVP.md`. "In progress" means some of the milestone's work is in the t
 | M0 — Foundations and risk spikes | complete |
 | M1 — Read path and published site | complete |
 | M2 — Editor and write path | complete |
-| M3 — Conflicts, versions, renames | in progress (planned) |
+| M3 — Conflicts, versions, renames | in progress |
 | M4 — Production readiness, v1.0 | not started |
 
 ## M0 exit, met
@@ -115,6 +115,17 @@ Still unverified. These are not the exit sentence, and they are not done:
 4. **The site updates.** Met. `/m2-exit` on the published site showed the new paragraph 4 seconds after the merge, from the push webhook with no manual sync, and the draft moved to `merged` from the `pull_request` webhook.
 
 ## Changelog
+
+### 2026-11-01 — M3 slice 1: block-level conflicts and `resolveDraft`
+
+- `mergeUnits` (`packages/doc-model/src/units.ts`) splits a file into merge units: frontmatter lines, one unit per top-level block with the blank lines before it, and the trailing bytes. Non-markdown or unparseable files split into lines. The units join back to the file byte for byte, checked over 613 corpus and fixture files in this session.
+- `packages/drafts/src/merge3.ts`: a three-way merge over those units. A unit neither side changed is copied as it was; a unit one side changed takes that side; equal changes are not conflicts; a span both sides changed differently becomes one conflict region of whole blocks. Spans where both sides replaced the same number of blocks merge block by block, so edits to neighbouring blocks do not collide. `resolveRegions` builds the file from one choice per conflict: mine, theirs, or hand-written text.
+- `packages/drafts/src/conflicts.ts`:
+  - `draftConflicts` lists a conflicted draft's files against the current head: text conflicts as regions, structural ones as a keep-mine / take-theirs choice. The structural cases are deleted upstream, deleted in the draft but edited upstream, added on both sides, the original of a rename gone, and the rename target taken; the last offers only take-theirs.
+  - `resolveDraft` applies one resolution per conflicted file, moves cleanly merging files with the head, and puts the draft back to `editing` (or `proposed` if it has a PR). A file that ends up equal to the head leaves the draft. It refuses a stale `If-Match`, a head that moved since the view (`DraftHeadMoved`), a missing or impossible choice, and paths not in conflict.
+  - The rebase decision now carries a conflict code and the upstream blob, so the view and the resolution reuse it.
+- Tests: `merge3.test.ts` (7): the H2 spike's scenarios, neighbouring and multi-line blocks, raw blocks with frontmatter, CRLF and BOM, insertions and deletions, wrong choice counts, and a 400-run property over the committed fixtures that no edit from either side is dropped without a choice. `conflicts.test.ts` (3, PostgreSQL): a draft with seven kinds of file conflicted by an upstream move, viewed, refused four ways, and resolved with mixed choices; a heading and its paragraph edited on different sides, which `git merge-file` refuses and the block-level merge settles; a second upstream move and a second resolution; a proposed draft returns to `proposed`. Drafts suite 26 pass, doc-model 38, worker 8.
+- One finding while writing the property test: identical units (for example two `---` lines) can align ambiguously and produce a larger conflict region than necessary. The conflict view shows both sides in full, so nothing is lost, but the region can be bigger than needed.
 
 ### 2026-11-01 — M3 planned
 

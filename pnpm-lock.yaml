@@ -253,6 +253,9 @@ importers:
       '@oxybook/db':
         specifier: workspace:*
         version: link:../db
+      '@oxybook/doc-model':
+        specifier: workspace:*
+        version: link:../doc-model
       '@oxybook/git-write':
         specifier: workspace:*
         version: link:../git-write
@@ -263,6 +266,9 @@ importers:
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
+      fast-check:
+        specifier: 4.10.2
+        version: 4.10.2
       tsx:
         specifier: 4.23.15
         version: 4.23.15

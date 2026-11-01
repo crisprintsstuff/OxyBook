@@ -75,3 +75,4 @@ export type {
   TextSpan,
 } from './types.js';
 export { blockIsDirty } from './types.js';
+export { lineUnits, mergeUnits } from './units.js';
