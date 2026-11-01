@@ -713,6 +713,7 @@ function renderSpacePage(input: {
             </p>
           </div>
           <div style="display:flex;gap:0.5rem;align-items:center">
+            <a class="btn" href="/orgs/${encodeURIComponent(space.orgSlug)}/spaces/${encodeURIComponent(space.slug)}/edit">${space.userRole === 'viewer' ? 'Open editor (read-only)' : 'Edit pages'}</a>
             <a class="btn secondary" href="${escapeHtml(siteUrl)}" target="_blank" rel="noopener noreferrer">Open published site &rarr;</a>
             ${syncForm}
           </div>

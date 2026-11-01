@@ -19,6 +19,7 @@ import { runSpaceBuild } from '@oxybook/renderer';
 import { runSpaceSync, storedAppTokens } from '@oxybook/sync';
 import { type Delivery, handleDelivery, pruneDeliveries } from './deliveries.js';
 import { createEditorApi } from './editor-api.js';
+import { createEditorAssets } from './editor-assets.js';
 import { createGithubRoutes } from './github-routes.js';
 import { createUiRoutes, type UiRouteOptions } from './ui-routes.js';
 
@@ -116,10 +117,16 @@ export function startAppServer(options: {
         ...(options.ui.now ? { now: options.ui.now } : {}),
       })
     : null;
+  const editorAssets = options.ui
+    ? createEditorAssets(
+        process.env.OXYBOOK_EDITOR_DIST ? { distDir: process.env.OXYBOOK_EDITOR_DIST } : {},
+      )
+    : null;
   const server = createServer(async (request, response) => {
     const rawBody = await readRawBody(request);
     if (await github.handle(request, response, rawBody)) return;
     if (editor && (await editor.handle(request, response, rawBody))) return;
+    if (editorAssets && (await editorAssets.handle(request, response))) return;
     if (ui && (await ui.handle(request, response, rawBody))) return;
     const url = request.url?.split('?')[0];
     if (request.method === 'GET' && url === '/healthz') {

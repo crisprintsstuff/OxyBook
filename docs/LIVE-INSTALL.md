@@ -275,3 +275,14 @@ The App created from `/setup/github` already has the callback URL `<OXYBOOK_PUBL
 2. From then on, **Sign in with GitHub** on the login page signs you in. It never creates an account: link first.
 3. Pull requests you propose are opened as you when your GitHub account can write to the repository, and their commits carry your GitHub noreply address. Otherwise the App opens them. **Unlink GitHub** on the dashboard switches back to the App.
 
+
+## Edit in the browser
+
+`pnpm dev` builds the editor (`apps/editor`) before it starts and rebuilds it when its files change. The container image builds it too.
+
+1. Open a space from the dashboard and click **Edit pages**, or go to `<OXYBOOK_PUBLIC_URL>/orgs/<org>/spaces/<space>/edit`.
+2. Pick a page on the left and type. Edits save to your draft about a second after you stop typing; the badge at the top says **Saved**. The preview on the right uses the same renderer as the site.
+3. **Changes (n)** shows the diff of the whole draft. **Propose changes** asks for a title and the sign-off choice, queues the propose job, and shows the pull request link once the worker has opened it. The worker must be running (`pnpm dev` starts it).
+4. Viewers see the same screen read-only.
+
+If the edit page says the editor is not built, run `pnpm build:editor` and reload.
