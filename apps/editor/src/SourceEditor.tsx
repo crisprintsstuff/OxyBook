@@ -5,6 +5,7 @@ import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import { darkScheme, editorTheme } from './theme.ts';
 
 /** What the page can do to the source editor from outside. */
 export interface SourceEditorHandle {
@@ -32,6 +33,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const editable = useRef(new Compartment());
+  const theme = useRef(new Compartment());
   const changed = useRef(onChange);
   changed.current = onChange;
 
@@ -46,6 +48,7 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
           basicSetup,
           markdown(),
           EditorView.lineWrapping,
+          theme.current.of(editorTheme(darkScheme())),
           editable.current.of([
             EditorState.readOnly.of(readOnly),
             EditorView.editable.of(!readOnly),
@@ -71,6 +74,15 @@ export const SourceEditor = forwardRef<SourceEditorHandle, Props>(function Sourc
       ]),
     });
   }, [readOnly]);
+
+  // Follow the system colour scheme while the page is open.
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-color-scheme: dark)');
+    const apply = () =>
+      view.current?.dispatch({ effects: theme.current.reconfigure(editorTheme(query.matches)) });
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     insert(text: string) {

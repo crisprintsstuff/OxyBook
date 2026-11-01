@@ -43,6 +43,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
   - Autosave about a second after typing stops, with `If-Match`. If another tab saved first, a banner offers to keep this tab's text or load the saved one.
   - Live preview through the build renderer, in an iframe sandboxed with no permissions, with the renderer's warnings listed.
   - **Changes (n)** shows the draft's unified diff. **Propose changes** / **Update pull request** takes a title and an optional DCO sign-off, then polls until the PR link appears or the job records an error.
+  - Follows the system light/dark setting, like the dashboard: page, source editor, and preview.
   - Also: image upload into `images/` next to the page (inserts a relative reference), revert a page, discard the draft. Viewers get the same screen read-only.
 - **Write path (`packages/git-write`):** `commitFiles` builds one commit from any mix of add, modify, delete, and rename, using a temporary index on the bare mirror. Its guards: content root or `oxybook.yml` only, never a hidden path (`.github/workflows` included), a size limit, and one op per path consistent with the base. It adds a DCO trailer only when asked. `mergeFile3` wraps `git merge-file`. Nothing pushes these commits yet (slice 3). The M0 `oxybook-dev propose` CLI pushes a single file to `oxybook/*` with `--force-with-lease` and opens a pull request. It opened oxybook-test#1 (hand-made App) and #2 (manifest-created App), each with a diff of exactly one file. Signed-commit ruleset behaviour is in `docs/M0-GITHUB-SPIKE.md`.
 - **Running it:** on the owner's machine, `pnpm dev` runs app and worker on the host (`PORT=3100`, `HEALTH_PORT=3101`, because another service holds 3000), with compose `postgres` and `caddy` (`CADDY_PORT=8180`, because another service holds 8080) and a Cloudflare tunnel `oxybook.example.com` → `localhost:3100`. Host processes read the repo `.env`. The container image (`docker compose up --build`) also starts and migrates. Steps are in `docs/LIVE-INSTALL.md`.
@@ -115,6 +116,11 @@ In progress. `docs/M2-PLAN.md` puts the scope below in order. Slice 1 (`packages
 **Done when:** an end-to-end test edits one paragraph in an `.mdx` page containing JSX components, raw HTML and unusual frontmatter, and the resulting PR diff touches only that paragraph's lines; a non-GitHub user can propose a change that a GitHub user then merges, and the site updates.
 
 ## Changelog
+
+### 2026-11-01 — Editor follows dark mode
+
+- The owner found the white editor jarring next to the dark dashboard. The editor page, the CodeMirror source editor (`apps/editor/src/theme.ts`, GitHub light/dark colours), and the preview iframe now follow `prefers-color-scheme`, and switch live when the system setting changes.
+- `pnpm e2e:editor` passed with `E2E_COLOR_SCHEME=dark` and with light, and the dark screenshots were checked by eye. Not yet seen on the owner's machine.
 
 ### 2026-11-01 — M2 slice 4b: the editor UI, source mode
 
