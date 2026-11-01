@@ -23,7 +23,8 @@
     "build:libs": "pnpm --filter @oxybook/github --filter @oxybook/db --filter @oxybook/doc-model --filter @oxybook/jobs --filter @oxybook/sync --filter @oxybook/theme-default --filter @oxybook/renderer --filter @oxybook/git-write --filter @oxybook/drafts build",
     "dev": "pnpm build:libs && pnpm build:editor && pnpm --parallel --filter @oxybook/server --filter @oxybook/worker --filter @oxybook/editor run dev:watch",
     "build:editor": "pnpm --filter @oxybook/editor build",
-    "e2e:editor": "pnpm build:libs && pnpm build:editor && pnpm --filter @oxybook/server run e2e:editor"
+    "e2e:editor": "pnpm build:libs && pnpm build:editor && pnpm --filter @oxybook/server run e2e:editor",
+    "m2:exit": "pnpm oxybook-admin m2-exit"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.4",

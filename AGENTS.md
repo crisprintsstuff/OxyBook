@@ -27,7 +27,7 @@ The non-negotiable invariant: **content lives in the customer's git repository, 
 
 ## Where the work stands
 
-M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs), and slice 4 (the editor: API, source mode, visual mode) are done; next is slice 5, `pnpm m2:exit`. Releases are tags (`docs/RELEASING.md`); `v0.1.0` is out. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
+M0 and M1 are complete (`pnpm m1:exit` verified all 4 clauses of the M1 exit sentence on the owner's machine). M2 is in progress (`docs/M2-PLAN.md`): slices 1–2 (the editor document bridge, and drafts with multi-file commits and 3-way rebase) and slice 3 (propose job, `pull_request` webhooks, editor/viewer on propose, Sign in with GitHub, account linking, user-authored PRs), and slice 4 (the editor: API, source mode, visual mode) are done; slice 5's `pnpm m2:exit` is written and waits for a run on the owner's machine. Releases are tags (`docs/RELEASING.md`); `v0.1.0` is out. `STATUS.md` has the current state and a `## Handoff` section. Read it before assuming anything works, and update it when you change what is true.
 
 ## Repository layout
 
@@ -73,6 +73,7 @@ pnpm oxybook-admin space list   # org/space setup without UI; `job ping` round-t
 pnpm oxybook-admin sync <org>/<space> [--now]   # queue (or run here) a sync; `pages <org>/<space>` lists the result
 pnpm oxybook-admin build <org>/<space> [--now]  # queue (or run here) a static site build into OXYBOOK_SITES_DIR
 pnpm m1:exit                  # run the M1 exit verification against the test repo and Caddy
+pnpm m2:exit <org>/<space>    # run the M2 exit check against the running stack and the space's repo (opens and merges real PRs)
 pnpm oxybook-admin draft save|show|propose <org>/<space> --user <email> …  # write path without the editor
 pnpm oxybook-check <dir>      # what would render as a placeholder, file:line
 pnpm compat:corpus           # the H3 report over corpus/cache; run test:corpus first

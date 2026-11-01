@@ -9,6 +9,7 @@ import { runSpaceSync, storedAppTokens } from '@oxybook/sync';
 import { createOrg, createSpace, listSpaces, lookupInstallation, parseRepo } from './admin.js';
 import { draftCommand } from './admin-drafts.js';
 import { runM1Exit } from './m1-exit.js';
+import { runM2Exit } from './m2-exit.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url));
 
@@ -25,6 +26,7 @@ const USAGE = `usage:
   oxybook-admin draft propose <org>/<space> --user <email> --title "<PR title>" [--sign-off]
   oxybook-admin job ping
   oxybook-admin m1-exit
+  oxybook-admin m2-exit <org>/<space>
 
 Needs DATABASE_URL. Without --installation-id, space create asks GitHub as the stored App,
 which needs OXYBOOK_SECRET_KEY. sync and build queue a job for the worker; --now runs it
@@ -59,6 +61,12 @@ export async function main(argv: readonly string[], env = process.env): Promise<
   if (!noun || args.includes('--help') || args.includes('-h')) {
     console.error(USAGE);
     return noun ? 0 : 2;
+  }
+
+  if (noun === 'm2-exit') {
+    const report = await runM2Exit(verb, env, (line) => console.log(line));
+    console.log(JSON.stringify(report, null, 2));
+    return 0;
   }
 
   if (noun === 'm1-exit') {
