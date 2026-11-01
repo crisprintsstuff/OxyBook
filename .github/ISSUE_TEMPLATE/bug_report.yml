@@ -1,0 +1,67 @@
+name: Bug report
+description: Something in OxyBook did not work the way the docs say it should.
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing OxyBook. It is early alpha, so rough edges are expected and every report helps.
+        **Security problems go to private vulnerability reporting (Security tab), not here.**
+        Please remove hostnames, emails, tokens, and private keys from anything you paste.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you saw instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the editor on a page with …
+        2. …
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Setup / install (Docker, .env, GitHub App)
+        - Sync from the repository
+        - Published site (build, nav, search)
+        - Editor
+        - Propose / pull requests
+        - Accounts / sign-in / roles
+        - Something else
+    validations:
+      required: true
+  - type: dropdown
+    id: changed-bytes
+    attributes:
+      label: Did OxyBook change bytes it should not have?
+      description: A diff that touches lines you did not edit is the most important kind of bug. Please attach the smallest file that shows it.
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+  - type: input
+    id: version
+    attributes:
+      label: OxyBook commit
+      description: Output of `git rev-parse --short HEAD` in your clone.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: How you run it
+      placeholder: docker compose on Ubuntu 24.04 / pnpm dev on WSL2, Node 24 / …
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant lines from `docker compose logs app worker` (or the pnpm dev terminal).
+      render: text

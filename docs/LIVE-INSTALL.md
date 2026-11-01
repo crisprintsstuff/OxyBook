@@ -37,7 +37,10 @@ kill <pid> <pid>                           # kill -9 if they are still there
 
 `docker-compose.yml` also sets `PORT` to `3000` inside the app container and does not publish it on the host. Caddy publishes host port **8080** and proxies to `app:3000`. `OXYBOOK_PUBLIC_URL` in `.env.example` is `http://app.localhost:8080`. That is Caddy, not the port the Node process listens on.
 
-Point `cloudflared` at `http://localhost:3000`. If you exported `PORT` to something else, use that value instead. If another program already holds 3000 or 3001 (Grafana defaults to 3000), put `PORT=3100` and `HEALTH_PORT=3101` in `.env` and point the tunnel at 3100. Do not point the tunnel at 8080 unless you are tunneling Caddy on purpose. Run the app on the host (`pnpm dev`) so port 3000 is open on the machine where `cloudflared` runs.
+Which port the tunnel hits depends on how you run OxyBook:
+
+- **Everything in Docker (`docker compose up`, the README's "Try it"):** point the tunnel at Caddy, `http://localhost:8080` (or your `CADDY_PORT`). Caddy sends any hostname other than `app.localhost` and `*.docs.localhost` to the app, so the tunnel's hostname reaches it.
+- **App on the host (`pnpm dev`):** point the tunnel at `http://localhost:3000`, or at whatever `PORT` you set. If another program already holds 3000 or 3001 (Grafana defaults to 3000), put `PORT=3100` and `HEALTH_PORT=3101` in `.env` and point the tunnel at 3100.
 
 ## Cloudflare Tunnel
 
