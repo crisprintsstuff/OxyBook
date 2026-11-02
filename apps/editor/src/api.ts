@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type {
+  ConflictView,
   DiffFile,
   DraftSummary,
   FileOp,
   PageResponse,
   PreviewResponse,
+  RegionChoice,
   TreeResponse,
 } from './model.ts';
+
+/** One resolution per conflicted file, as `POST draft/resolve` takes it. */
+export type Resolution =
+  | { path: string; take: 'keep-mine' | 'take-theirs' }
+  | { path: string; choices: RegionChoice[] };
 
 /** An error answer from the editor API, with its status and body. */
 export class ApiError extends Error {
@@ -134,6 +141,19 @@ export class EditorApi {
 
   async discard(ifMatch: number): Promise<void> {
     await this.call('POST', 'draft/discard', { json: {}, ifMatch });
+  }
+
+  conflicts(): Promise<ConflictView> {
+    return this.call('GET', 'draft/conflicts');
+  }
+
+  async resolve(ifMatch: number, head: string, resolutions: Resolution[]): Promise<DraftSummary> {
+    return (
+      await this.call<{ draft: DraftSummary }>('POST', 'draft/resolve', {
+        json: { head, resolutions },
+        ifMatch,
+      })
+    ).draft;
   }
 
   async propose(title: string, signOff: boolean): Promise<{ queued: boolean }> {

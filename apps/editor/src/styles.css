@@ -635,3 +635,88 @@ textarea {
   max-height: 300px;
   overflow: auto;
 }
+
+/* Conflict resolver */
+.conflict-file {
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+  margin-top: 12px;
+}
+.conflict-file h3 {
+  font-size: 14px;
+  margin: 0 0 6px;
+}
+.conflict-region {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 8px 0;
+}
+.sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.sides h4 {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.modal .modal-body .conflict-preview pre {
+  white-space: pre-wrap;
+  font-size: 12px;
+  background: var(--panel);
+  padding: 8px;
+  border-radius: 6px;
+}
+.modal .modal-body .sides pre {
+  margin: 0;
+  padding: 8px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  max-height: 220px;
+  overflow: auto;
+}
+.modal .modal-body .sides .picked pre {
+  border-color: var(--ok);
+  background: var(--ok-bg);
+}
+.region-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.region-actions button.on {
+  background: var(--info-bg);
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.conflict-region textarea {
+  width: 100%;
+  margin-top: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 6px;
+}
+.choice-conflict .check {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+}
+@media (max-width: 700px) {
+  .sides {
+    grid-template-columns: 1fr;
+  }
+}
+.modal-body > .actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}

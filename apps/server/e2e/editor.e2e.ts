@@ -248,9 +248,63 @@ try {
     .executeTakeFirstOrThrow();
   assert.equal(file.path, 'docs/guide.mdx');
   assert.equal(file.bytes?.toString('utf8'), expected);
+
+  // Upstream edits the same paragraph; sync updates the read model and the rebase marks
+  // the draft conflicted (both stood in for here). The editor resolves it block by block.
+  const upstream = PAGE.replace(
+    'Read the [install page](install.md).',
+    'Read the [install guide](install.md) first.',
+  );
+  await db
+    .insertInto('blobs')
+    .values({ org_id: org.id, sha: sha1(upstream), bytes: Buffer.from(upstream) })
+    .execute();
+  await db
+    .updateTable('pages')
+    .set({ blob_sha: sha1(upstream) })
+    .where('path', '=', 'guide.mdx')
+    .execute();
+  await db
+    .updateTable('ref_state')
+    .set({ head_sha: 'e'.repeat(40) })
+    .execute();
+  await db.updateTable('drafts').set({ state: 'conflicted' }).execute();
+  await page.reload();
+  await page.getByRole('button', { name: 'Resolve conflicts' }).click();
+  const resolver = page.getByRole('dialog', { name: 'Resolve conflicts' });
+  await resolver.locator('.conflict-region').waitFor();
+  assert.equal(await resolver.locator('.conflict-region').count(), 1);
+  assert.match((await resolver.locator('.sides').first().textContent()) ?? '', /install guide/);
+  await resolver.getByRole('button', { name: 'Edit' }).click();
+  await resolver
+    .getByLabel('Resolved text for conflict 1')
+    .fill('Read the [install guide](install.md) first. Then come back. See [Install](install.md)');
+  await page.screenshot({
+    path: (process.env.E2E_SCREENSHOT ?? '/tmp/editor-e2e.png').replace('.png', '-conflict.png'),
+  });
+  await resolver.getByRole('button', { name: 'Apply resolution' }).click();
+  await page.getByText('Conflicts resolved.').waitFor();
+  const resolved = await db
+    .selectFrom('draft_files')
+    .select(['bytes', 'base_blob_sha'])
+    .executeTakeFirstOrThrow();
+  // The title change merged on its own; the paragraph is the hand-written resolution.
+  assert.equal(
+    resolved.bytes?.toString('utf8'),
+    expected.replace(
+      'Read the [install page](install.md).',
+      'Read the [install guide](install.md) first.',
+    ),
+  );
+  assert.equal(resolved.base_blob_sha, sha1(upstream));
+  const after = await db
+    .selectFrom('drafts')
+    .select(['state', 'base_sha'])
+    .executeTakeFirstOrThrow();
+  assert.deepEqual(after, { state: 'proposed', base_sha: 'e'.repeat(40) });
   assert.deepEqual(errors, []);
   console.log(
-    'editor e2e: visual edit, link picker, page settings, source mode, diff, propose: ok',
+    'editor e2e: visual edit, link picker, page settings, source mode, diff, propose, conflict resolution: ok',
   );
 } finally {
   await browser?.close();

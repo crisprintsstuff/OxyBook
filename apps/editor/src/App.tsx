@@ -2,6 +2,7 @@
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiError, type EditorApi } from './api.ts';
+import { ConflictDialog } from './conflicts.tsx';
 import { DiffModal, ProposeDialog } from './dialogs.tsx';
 import {
   altText,
@@ -70,7 +71,7 @@ export function App({ api }: { api: EditorApi }) {
   const [save, setSave] = useState<SaveState>({ kind: 'saved' });
   const [showPreview, setShowPreview] = useState(true);
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
-  const [dialog, setDialog] = useState<'diff' | 'propose' | null>(null);
+  const [dialog, setDialog] = useState<'diff' | 'propose' | 'conflicts' | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const editor = useRef<PageEditorHandle>(null);
@@ -440,7 +441,8 @@ export function App({ api }: { api: EditorApi }) {
             <button
               type="button"
               className="primary"
-              disabled={changeCount === 0}
+              disabled={changeCount === 0 || draft?.state === 'conflicted'}
+              title={draft?.state === 'conflicted' ? 'Resolve the conflicts first' : undefined}
               onClick={() => void flush().then(() => setDialog('propose'))}
             >
               {draft?.prUrl ? 'Update pull request' : 'Propose changes'}
@@ -450,7 +452,13 @@ export function App({ api }: { api: EditorApi }) {
         <span className="muted user">{tree.user.name}</span>
       </header>
 
-      {draft && <DraftBanner draft={draft} onDiscard={canWrite ? discardDraft : undefined} />}
+      {draft && (
+        <DraftBanner
+          draft={draft}
+          onDiscard={canWrite ? discardDraft : undefined}
+          onResolve={canWrite ? () => void flush().then(() => setDialog('conflicts')) : undefined}
+        />
+      )}
       {save.kind === 'conflict' && (
         <div className="banner warn">
           Your draft changed in another tab or window (now version {save.current}).{' '}
@@ -625,6 +633,25 @@ export function App({ api }: { api: EditorApi }) {
       </div>
 
       {dialog === 'diff' && <DiffModal api={api} onClose={() => setDialog(null)} />}
+      {dialog === 'conflicts' && draft && (
+        <ConflictDialog
+          api={api}
+          draft={draft}
+          baseRef={tree.space.ref}
+          onClose={() => setDialog(null)}
+          onResolved={(next) => {
+            setDialog(null);
+            applyDraft(next);
+            setNotice('Conflicts resolved. Your draft is up to date with the latest commits.');
+            const current = pageRef.current;
+            if (current) {
+              // The page's text and base changed on the server; load them fresh.
+              savedText.current = text.current;
+              void loadPage(current.path);
+            }
+          }}
+        />
+      )}
       {dialog === 'propose' && draft && (
         <ProposeDialog
           api={api}
@@ -668,16 +695,22 @@ function SaveBadge({ save }: { save: SaveState }) {
 function DraftBanner({
   draft,
   onDiscard,
+  onResolve,
 }: {
   draft: DraftSummary;
   onDiscard: (() => Promise<void>) | undefined;
+  onResolve: (() => void) | undefined;
 }) {
   return (
     <div className={`banner ${draft.state === 'conflicted' ? 'warn' : 'info'}`}>
       {draft.state === 'conflicted' ? (
         <>
-          Your draft conflicts with new commits on <code>{draft.baseRef}</code>. Fix the conflicting
-          page in source mode, or discard the draft. (A block-level conflict view comes later.)
+          Your draft conflicts with new commits on <code>{draft.baseRef}</code>.{' '}
+          {onResolve && (
+            <button type="button" className="primary" onClick={onResolve}>
+              Resolve conflicts
+            </button>
+          )}
         </>
       ) : draft.prUrl ? (
         <>
