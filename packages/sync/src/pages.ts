@@ -99,6 +99,26 @@ export function parseExcludeList(bytes: Buffer): string[] {
   return [];
 }
 
+/** The `from` URLs of `redirects:` in oxybook.yml (empty when the file is malformed). */
+export function parseRedirectSources(bytes: Buffer): string[] {
+  try {
+    const parsed = parseYaml(bytes.toString('utf8')) as unknown;
+    const raw =
+      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>).redirects
+        : null;
+    if (Array.isArray(raw))
+      return raw.flatMap((item) =>
+        item && typeof item === 'object' && typeof (item as { from?: unknown }).from === 'string'
+          ? [(item as { from: string }).from]
+          : [],
+      );
+  } catch {
+    // Ignore malformed oxybook.yml.
+  }
+  return [];
+}
+
 /** Path relative to the content root, or null when the file is outside it. */
 export function relativeToRoot(repoPath: string, root: string): string | null {
   if (!root) return repoPath;

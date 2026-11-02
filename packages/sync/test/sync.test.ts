@@ -178,6 +178,22 @@ describe('sync', { skip: url ? false : 'DATABASE_URL is not set' }, () => {
     ]);
   });
 
+  it('retires an inferred redirect once oxybook.yml commits it', async () => {
+    write(work, {
+      'oxybook.yml': 'redirects:\n  - from: /guides/install\n    to: /guides/setup\n',
+    });
+    git(work, 'add', '-A');
+    git(work, 'commit', '--quiet', '-m', 'commit redirect');
+    git(work, 'push', '--quiet', remote, 'main');
+    await syncSpace(db, target, source);
+    const left = await db.selectFrom('inferred_redirects').select('from_url').execute();
+    assert.deepEqual(left, []);
+    git(work, 'rm', '--quiet', 'oxybook.yml');
+    git(work, 'commit', '--quiet', '-m', 'drop config again');
+    git(work, 'push', '--quiet', remote, 'main');
+    await syncSpace(db, target, source);
+  });
+
   it('is a no-op when nothing changed, and recovers after the mirror is deleted', async () => {
     const again = await syncSpace(db, target, source);
     assert.deepEqual([again.added, again.modified, again.deleted], [[], [], []]);

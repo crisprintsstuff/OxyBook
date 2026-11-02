@@ -8,6 +8,7 @@ import {
   pageMeta,
   pageUrl,
   parseExcludeList,
+  parseRedirectSources,
   relativeToRoot,
 } from './pages.js';
 
@@ -271,6 +272,17 @@ export async function syncSpace(
             commit_sha: to,
           }),
         )
+        .execute();
+    }
+    // Out-of-band renames whose redirect is now committed to oxybook.yml are retired: the
+    // config serves them (docs/M3-PLAN.md slice 4).
+    const committed = configBlob ? parseRedirectSources(configBlob.bytes) : [];
+    if (committed.length) {
+      await trx
+        .deleteFrom('inferred_redirects')
+        .where('space_id', '=', target.spaceId)
+        .where('ref', '=', target.ref)
+        .where('from_url', 'in', committed)
         .execute();
     }
   });
