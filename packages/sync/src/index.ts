@@ -4,6 +4,7 @@ export { authEnv, GitError } from './git.js';
 export {
   fetchRef,
   findRenames,
+  fullRef,
   LeaseRejected,
   listFiles,
   mirrorBlobSource,
@@ -12,6 +13,7 @@ export {
   type Rename,
   readBlobs,
   remoteHead,
+  resolveRemoteRef,
   type TreeEntry,
 } from './mirror.js';
 export {
@@ -38,3 +40,10 @@ export {
   type UserGithub,
 } from './runner.js';
 export { type SyncResult, type SyncTarget, syncSpace } from './sync.js';
+export {
+  parseVersions,
+  type SpaceVersion,
+  spaceVersions,
+  updateSpaceVersions,
+  type VersionEntry,
+} from './versions.js';

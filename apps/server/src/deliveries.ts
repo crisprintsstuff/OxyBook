@@ -46,23 +46,38 @@ export async function handleDelivery(
   if (input.event !== 'push') return { kind: 'ignored', reason: `event ${input.event}` };
 
   const payload = (input.payload ?? {}) as PushPayload;
-  const ref = typeof payload.ref === 'string' ? payload.ref : '';
-  if (!ref.startsWith('refs/heads/')) return { kind: 'ignored', reason: `ref ${ref || 'missing'}` };
-  if (payload.deleted === true) return { kind: 'ignored', reason: `branch ${ref} deleted` };
-  const branch = ref.slice('refs/heads/'.length);
+  const pushed = typeof payload.ref === 'string' ? payload.ref : '';
+  // A branch is stored by name (spaces.default_ref, space_versions.ref); a tag in full.
+  let branch: string;
+  if (pushed.startsWith('refs/heads/')) branch = pushed.slice('refs/heads/'.length);
+  else if (pushed.startsWith('refs/tags/')) branch = pushed;
+  else return { kind: 'ignored', reason: `ref ${pushed || 'missing'}` };
+  if (payload.deleted === true) return { kind: 'ignored', reason: `${pushed} deleted` };
   const owner = payload.repository?.owner?.login ?? payload.repository?.owner?.name;
   const repo = payload.repository?.name;
   if (typeof owner !== 'string' || typeof repo !== 'string') {
     return { kind: 'ignored', reason: 'push without repository owner and name' };
   }
 
-  // GitHub owner and repo names are case-insensitive.
+  // GitHub owner and repo names are case-insensitive. A space follows its default ref and
+  // every version listed on it (ARCHITECTURE §2.6).
   const spaces = await db
     .selectFrom('spaces')
     .select('id')
     .where(sql<boolean>`lower(repo_owner) = lower(${owner})`)
     .where(sql<boolean>`lower(repo_name) = lower(${repo})`)
-    .where('default_ref', '=', branch)
+    .where((eb) =>
+      eb.or([
+        eb('default_ref', '=', branch),
+        eb.exists(
+          eb
+            .selectFrom('space_versions')
+            .select('space_versions.space_id')
+            .whereRef('space_versions.space_id', '=', 'spaces.id')
+            .where('space_versions.ref', '=', branch),
+        ),
+      ]),
+    )
     .execute();
   if (spaces.length === 0) {
     return { kind: 'ignored', reason: `no space follows ${owner}/${repo}@${branch}` };

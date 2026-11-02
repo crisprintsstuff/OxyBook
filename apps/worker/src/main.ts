@@ -7,7 +7,7 @@ import { createDb, type Database, type Kysely } from '@oxybook/db';
 import { getDraft, ProposeRetry, proposeDraft, rebaseDrafts } from '@oxybook/drafts';
 import { checkUserRepoAccess, githubNoreplyEmail, openPullRequest } from '@oxybook/github';
 import { buildKey, type JobQueue, startJobs, syncKey } from '@oxybook/jobs';
-import { type BuildEnvironment, runSpaceBuild } from '@oxybook/renderer';
+import { type BuildEnvironment, runSpaceBuild, VersionNotListed } from '@oxybook/renderer';
 import {
   findStaleSpaces,
   LeaseRejected,
@@ -15,6 +15,7 @@ import {
   type SyncEnvironment,
   spaceBlobSource,
   spaceGit,
+  spaceVersions,
   storedAppTokens,
   storedUserTokens,
   type UserGithub,
@@ -169,6 +170,18 @@ export async function startJobWorker(
     log,
   };
 
+  const building = new Map<string, Promise<unknown>>();
+  const serialBySpace = async <T>(spaceId: string, run: () => Promise<T>): Promise<T> => {
+    const before = building.get(spaceId) ?? Promise.resolve();
+    const next = before.catch(() => {}).then(run);
+    building.set(spaceId, next);
+    try {
+      return await next;
+    } finally {
+      if (building.get(spaceId) === next) building.delete(spaceId);
+    }
+  };
+
   await jobs.work(
     'ping',
     async (job) => {
@@ -186,13 +199,44 @@ export async function startJobWorker(
       try {
         const synced = await runSpaceSync(env, spaceId, ref);
         if (synced.from !== synced.to) await rebaseOpenDrafts(env, spaceId, ref, synced.to, log);
-        if (options.buildAfterSync !== false) {
+        // Each version builds from its own ref (ARCHITECTURE §2.6); a ref no version lists
+        // (removed from versions:) is synced but not built.
+        const versions = await spaceVersions(db, spaceId);
+        const space = await db
+          .selectFrom('spaces')
+          .select('default_ref')
+          .where('id', '=', spaceId)
+          .executeTakeFirstOrThrow();
+        const isDefault = ref === space.default_ref;
+        const version = isDefault
+          ? 'default'
+          : versions.find((v) => !v.isDefault && v.ref === ref)?.name;
+        if (options.buildAfterSync !== false && version) {
           const buildJobId = await jobs.send(
             'build',
-            { spaceId, version: 'default', ref, reason: 'sync' },
-            { singletonKey: buildKey(spaceId, 'default') },
+            { spaceId, version, ref, reason: 'sync' },
+            { singletonKey: buildKey(spaceId, version) },
           );
-          log(`sync ${spaceId} ${ref}: build ${buildJobId ?? 'already queued'}`);
+          log(`sync ${spaceId} ${ref}: build ${version} ${buildJobId ?? 'already queued'}`);
+        } else if (!version) {
+          log(`sync ${spaceId} ${ref}: no version lists this ref; not built`);
+        }
+        if (isDefault) {
+          // A version listed for the first time has never been synced: sync it now.
+          const synced = await db
+            .selectFrom('ref_state')
+            .select('ref')
+            .where('space_id', '=', spaceId)
+            .execute();
+          for (const v of versions) {
+            if (v.isDefault || synced.some((r) => r.ref === v.ref)) continue;
+            const syncJobId = await jobs.send(
+              'sync',
+              { spaceId, ref: v.ref, reason: 'version' },
+              { singletonKey: syncKey(spaceId, v.ref) },
+            );
+            log(`sync ${spaceId}: version ${v.name} (${v.ref}) ${syncJobId ?? 'already queued'}`);
+          }
         }
       } catch (error) {
         log(`job sync ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -207,8 +251,15 @@ export async function startJobWorker(
       const { spaceId, version, ref, reason } = job.data;
       log(`job build ${job.id} space ${spaceId} version ${version} ref ${ref} (${reason})`);
       try {
-        await runSpaceBuild(env, spaceId, { version, ref });
+        // One build per space at a time: each assembles the release from the others.
+        await serialBySpace(spaceId, () =>
+          runSpaceBuild(env, spaceId, version === 'default' ? { version, ref } : { version }),
+        );
       } catch (error) {
+        if (error instanceof VersionNotListed) {
+          log(`job build ${job.id}: ${error.message}; skipped`);
+          return;
+        }
         log(
           `job build ${job.id} failed: ${error instanceof Error ? error.message : String(error)}`,
         );

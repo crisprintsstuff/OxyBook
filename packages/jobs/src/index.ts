@@ -14,7 +14,7 @@ export interface JobPayloads {
   sync: {
     spaceId: string;
     ref: string;
-    reason: 'push' | 'reconcile' | 'manual';
+    reason: 'push' | 'reconcile' | 'manual' | 'version';
     deliveryId?: string;
     /** The head GitHub reported, for the log. Sync fetches and uses the real head. */
     after?: string;

@@ -112,6 +112,49 @@ describe('webhook deliveries', { skip: url ? false : 'DATABASE_URL is not set' }
     assert.equal(sent.length, 1);
   });
 
+  it('queues a sync for a push to a listed version branch or tag, and not to unlisted ones', async () => {
+    const { org_id } = await db
+      .selectFrom('spaces')
+      .select('org_id')
+      .where('id', '=', spaceId)
+      .executeTakeFirstOrThrow();
+    await db
+      .insertInto('space_versions')
+      .values([
+        { org_id, space_id: spaceId, name: 'latest', ref: 'main', is_default: true, position: 0 },
+        { org_id, space_id: spaceId, name: '1.x', ref: 'release/1.x', position: 1 },
+        { org_id, space_id: spaceId, name: 'v0.9', ref: 'refs/tags/v0.9.0', position: 2 },
+      ])
+      .execute();
+    const before = sent.length;
+    const branch = await handleDelivery(db, jobs, {
+      event: 'push',
+      delivery: 'v1',
+      payload: push('refs/heads/release/1.x'),
+    });
+    const tag = await handleDelivery(db, jobs, {
+      event: 'push',
+      delivery: 'v2',
+      payload: push('refs/tags/v0.9.0'),
+    });
+    const other = await handleDelivery(db, jobs, {
+      event: 'push',
+      delivery: 'v3',
+      payload: push('refs/tags/v0.8.0'),
+    });
+    assert.equal(branch.kind, 'queued');
+    assert.equal(tag.kind, 'queued');
+    assert.equal(other.kind, 'ignored');
+    assert.deepEqual(
+      sent.slice(before).map((s) => [(s.data as { ref: string }).ref, s.key]),
+      [
+        ['release/1.x', `${spaceId}:release/1.x`],
+        ['refs/tags/v0.9.0', `${spaceId}:refs/tags/v0.9.0`],
+      ],
+    );
+    await db.deleteFrom('space_versions').where('space_id', '=', spaceId).execute();
+  });
+
   it('moves the draft whose PR was merged, closed, or reopened', async () => {
     const user = await db
       .insertInto('users')

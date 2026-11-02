@@ -42,6 +42,7 @@ describe('schema v0 migrations', { skip: url ? false : 'DATABASE_URL is not set'
         '0005_propose',
         '0006_github_accounts',
         '0007_config_blob',
+        '0008_space_versions',
       ],
     });
     assert.deepEqual(await migrateToLatest(db, { schema }), { applied: [] });
@@ -65,6 +66,7 @@ describe('schema v0 migrations', { skip: url ? false : 'DATABASE_URL is not set'
         'ref_state',
         'sessions',
         'space_members',
+        'space_versions',
         'spaces',
         'users',
         'webhook_deliveries',
