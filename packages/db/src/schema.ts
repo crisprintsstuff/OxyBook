@@ -99,6 +99,8 @@ export interface RefStateTable {
   ref: string;
   head_sha: string;
   synced_at: ColumnType<Date, Date | string | undefined, Date | string>;
+  /** `oxybook.yml`'s blob at the head (0007); 'none' when the ref has none; null when not recorded yet. */
+  config_blob_sha: ColumnType<string | null, string | null | undefined, string | null>;
 }
 
 export interface PagesTable {

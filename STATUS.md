@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) is in progress (`docs/M3-PLAN.md`): slices 1–2 (block-level conflicts, `resolveDraft`, and the conflict view in the editor) are done; slice 3, rename and move from the editor, is next.
+- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) is in progress (`docs/M3-PLAN.md`): slices 1–3 (block-level conflicts, the conflict view, and rename/move with redirects and link patches) are done; slice 4, committing inferred redirects by PR, is next.
 - **Last update:** 2026-11-01.
 - **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -58,7 +58,8 @@ For the next session, human or agent.
 - **Resume here:**
   - **Try the editor live:** after pulling, `pnpm install --frozen-lockfile` and restart `pnpm dev`, then **Edit pages** on `cris/test` (LIVE-INSTALL.md, "Edit in the browser"). Not yet run on the owner's machine.
   - **Cut `v0.2.0`** (`docs/RELEASING.md`): M2 is complete.
-  - **M3** (`docs/M3-PLAN.md`): slice 3, rename and move from the editor (one draft with the move, a `redirects:` entry in `oxybook.yml`, and inbound-link patches).
+  - **M3** (`docs/M3-PLAN.md`): slice 4, inferred redirects committed by PR (through slice 3's `appendRedirect`).
+  - **After pulling slice 3:** restart `pnpm dev` (migration `0007` applies on start), then **Sync & rebuild** each space once, so OxyBook records its `oxybook.yml`. Until then a rename answers "sync the space once".
   - **Open on `oxybook-test`:** [#7](https://github.com/crisprintsstuff/oxybook-test/pull/7), the user-authored test PR. Merging it should mark its draft `merged`.
 - **Owner's live setup:** App `oxybook-cris`, installed on `crisprintsstuff/oxybook-test` (its App id and installation id are stored in the database), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.example.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
 - **After every pull:** `git pull && pnpm install --frozen-lockfile`, then restart `pnpm dev` (LIVE-INSTALL.md). Pulled code does not reload on its own. New migrations apply only with `OXYBOOK_MIGRATE_ON_START=true` in `.env` or `pnpm db:migrate`.
@@ -115,6 +116,37 @@ Still unverified. These are not the exit sentence, and they are not done:
 4. **The site updates.** Met. `/m2-exit` on the published site showed the new paragraph 4 seconds after the merge, from the push webhook with no manual sync, and the draft moved to `merged` from the `pull_request` webhook.
 
 ## Changelog
+
+### 2026-11-02 — M3 slice 3: rename and move from the editor
+
+- **Link destinations** (`packages/doc-model/src/links.ts`):
+  - `scanLinks` finds inline links, images and reference definitions with the byte range of each destination as written, checked against the parsed URL.
+  - Links inside raw blocks, inline HTML and JSX are reported, not touched.
+  - `rewriteLinks` changes only destination bytes, adding `<…>` when a new destination needs it.
+  - Helpers: `resolveHref`, `hrefBetween`, `splitHref` (keeps `?query#fragment`).
+  - Measured in this session over 612 corpus and fixture files: 17,040 links found. Every relative destination (1,484, of which 832 are reference definitions) was rewritten and rewritten back with byte-identical results, and no byte outside a destination changed. None of the 247 links the scanner could not pin down is relative; they are bare URLs.
+- **Redirect writer** (`packages/doc-model/src/config-edit.ts`, `appendRedirect`):
+  - Adds a redirect to `oxybook.yml` as inserted text at the list's indentation, keeping comments, quoting and CRLF.
+  - Creates the key or the file when missing.
+  - Refuses inline lists and YAML it cannot parse.
+- **`planRename`** (`packages/drafts/src/rename.ts`) builds one change set: the move, the moved page's own relative links re-pointed when its directory changes, inbound links in every page patched, and a redirect from the old URL to the new.
+  - A page that only exists in the draft is re-added without a redirect.
+  - It refuses a taken path, a `.md` ↔ `.mdx` change, and a no-op.
+- **`saveDraftFiles`**: an atomic multi-file save with one version bump; `saveDraftFile` now uses it.
+- **Migration `0007_config_blob`**: sync records `oxybook.yml`'s blob in `ref_state.config_blob_sha` (`none` when absent, NULL when not recorded yet) and stores its bytes. The app needs this to edit the config without a git mirror.
+- **Editor:**
+  - API `POST draft/rename` (`If-Match`, `from`, `to`) answers with the redirect, the patched files and the raw mentions.
+  - UI: a **Rename / move** button. The tree shows a moved page under its new path with its title, and the notice summarises links updated, the redirect, and raw HTML/JSX to check by hand.
+  - **Revert page** is hidden for moved pages; discard the draft to undo a rename.
+- **Tests:**
+  - `links.test.ts` (4), `config-edit.test.ts` (4), `rename.test.ts` (4).
+  - `editor-rename.test.ts` (PostgreSQL): the "sync once" refusal; a rename with link patches, a new `oxybook.yml`, and the page at its new path; a taken path refused.
+  - The sync test checks the recorded config blob, and the migration test lists `0007`.
+  - `pnpm e2e:editor` now renames the Install page in Chromium: the notice reports 2 links in 1 file and the redirect, and the draft holds exactly the rename, the patched page and `oxybook.yml`.
+  - Suites: doc-model 46, drafts 30, db 6, sync 12, server 35, editor 8, worker 8.
+- **Known gaps:**
+  - Renaming a page twice in one draft leaves the first redirect pointing at the intermediate URL.
+  - Renaming a directory as a whole is not built (one page at a time).
 
 ### 2026-11-02 — M3 slice 2: the conflict view in the editor
 

@@ -8,6 +8,7 @@ import type {
   PageResponse,
   PreviewResponse,
   RegionChoice,
+  RenameReport,
   TreeResponse,
 } from './model.ts';
 
@@ -141,6 +142,10 @@ export class EditorApi {
 
   async discard(ifMatch: number): Promise<void> {
     await this.call('POST', 'draft/discard', { json: {}, ifMatch });
+  }
+
+  rename(ifMatch: number, from: string, to: string): Promise<RenameReport> {
+    return this.call('POST', 'draft/rename', { json: { from, to }, ifMatch });
   }
 
   conflicts(): Promise<ConflictView> {

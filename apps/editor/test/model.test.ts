@@ -6,6 +6,7 @@ import {
   altText,
   buildTreeRows,
   type DraftSummary,
+  describeRename,
   describeWarning,
   diffLines,
   displayBlock,
@@ -151,5 +152,30 @@ describe('editor model', () => {
       'alpha\n\nbeta t\n\ngamma t\n\nd both\n',
     );
     assert.equal(displayBlock('\r\n\r\nbeta'), 'beta');
+  });
+
+  it('shows a moved page under its new path with its title, and describes the rename', () => {
+    const rows = buildTreeRows({
+      pages: [page('install.md', 'Install'), page('index.md', 'Home')],
+      contentRoot: 'docs',
+      draft: draft([{ path: 'docs/setup/install.md', op: 'rename', oldPath: 'docs/install.md' }]),
+    });
+    assert.deepEqual(
+      rows.map((r) => (r.kind === 'dir' ? `${r.name}/` : `${r.label} ${r.mine ?? ''}`.trim())),
+      ['Home', 'setup/', 'Install rename'],
+    );
+    assert.equal(
+      describeRename({
+        version: 2,
+        path: 'docs/setup/install.md',
+        redirect: { from: '/install', to: '/setup/install' },
+        patched: [
+          { path: 'docs/index.md', links: 2 },
+          { path: 'docs/setup/install.md', links: 1 },
+        ],
+        rawMentions: [{ path: 'docs/a.mdx', line: 4 }],
+      }),
+      'Moved to docs/setup/install.md. Updated 3 links in 2 files. /install will redirect to /setup/install. Check by hand: raw HTML or JSX mentions the old name in docs/a.mdx:4.',
+    );
   });
 });

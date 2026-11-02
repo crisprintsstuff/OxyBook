@@ -2,6 +2,7 @@
 
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Database, Kysely } from '@oxybook/db';
+import { inspectFrontmatter, parse } from '@oxybook/doc-model';
 import {
   type BlobSource,
   type Draft,
@@ -17,13 +18,17 @@ import {
   listDraftFiles,
   openDraft,
   openDraftsTouching,
+  planRename,
   removeDraftFile,
   resolveDraft,
+  type SpaceFile,
   saveDraftFile,
+  saveDraftFiles,
   spaceRoleOf,
 } from '@oxybook/drafts';
 import { type JobQueue, proposeKey } from '@oxybook/jobs';
 import { renderPage } from '@oxybook/renderer';
+import { pageUrl } from '@oxybook/sync';
 import {
   deriveCsrfToken,
   loadSessionUser,
@@ -489,6 +494,114 @@ export function createEditorApi(options: EditorApiOptions) {
       });
       sendJson(response, 200, {
         draft: draftSummary(resolved, await listDraftFiles(db, resolved.id)),
+      });
+      return;
+    }
+
+    if (method === 'POST' && action === 'draft/rename') {
+      const draft = await ownDraft(ctx);
+      if (draft.state === 'conflicted')
+        throw new HttpError(409, 'the draft has conflicts with new commits; resolve them first');
+      const body = jsonBody(rawBody);
+      const from = str(body.from, 'from');
+      const to = str(body.to, 'to');
+      const root = ctx.space.contentRoot ? `${ctx.space.contentRoot}/` : '';
+      if (!to.startsWith(root)) throw new HttpError(400, `pages live under ${root || 'the root'}`);
+
+      // The space as the draft sees it: the synced pages, overlaid with the draft's files.
+      const head = await db
+        .selectFrom('pages')
+        .innerJoin('blobs', (join) =>
+          join.onRef('blobs.org_id', '=', 'pages.org_id').onRef('blobs.sha', '=', 'pages.blob_sha'),
+        )
+        .select([
+          'pages.path as rel',
+          'pages.url as url',
+          'pages.blob_sha as sha',
+          'blobs.bytes as bytes',
+        ])
+        .where('pages.space_id', '=', ctx.space.id)
+        .where('pages.ref', '=', ctx.space.ref)
+        .execute();
+      const files = new Map<string, SpaceFile>();
+      for (const row of head)
+        files.set(root + row.rel, {
+          path: root + row.rel,
+          bytes: row.bytes,
+          baseBlobSha: row.sha,
+          drafted: null,
+        });
+      const drafted = await listDraftFiles(db, draft.id);
+      let configFile: (typeof drafted)[number] | undefined;
+      for (const f of drafted) {
+        if (f.path === 'oxybook.yml') {
+          configFile = f;
+          continue;
+        }
+        if (f.op === 'delete') files.delete(f.path);
+        else {
+          if (f.op === 'rename' && f.oldPath) files.delete(f.oldPath);
+          if (/\.mdx?$/i.test(f.path))
+            files.set(f.path, {
+              path: f.path,
+              bytes: f.bytes ?? Buffer.alloc(0),
+              baseBlobSha: f.baseBlobSha,
+              drafted: { op: f.op, oldPath: f.oldPath },
+            });
+        }
+      }
+      let config: { bytes: Buffer | null; baseBlobSha: string | null; drafted: boolean };
+      if (configFile) {
+        config = { bytes: configFile.bytes, baseBlobSha: configFile.baseBlobSha, drafted: true };
+      } else {
+        const state = await db
+          .selectFrom('ref_state')
+          .select('config_blob_sha')
+          .where('space_id', '=', ctx.space.id)
+          .where('ref', '=', ctx.space.ref)
+          .executeTakeFirst();
+        const sha = state?.config_blob_sha ?? null;
+        if (sha === null)
+          throw new HttpError(
+            409,
+            'sync the space once (Sync & rebuild on the space page) so OxyBook knows its oxybook.yml, then rename',
+          );
+        config =
+          sha === 'none'
+            ? { bytes: null, baseBlobSha: null, drafted: false }
+            : {
+                bytes: await dbBlobs(db, ctx.space.orgId).blob(sha),
+                baseBlobSha: sha,
+                drafted: false,
+              };
+      }
+
+      // URLs: the one the site serves now (the original path's, for a page already moved in
+      // this draft), and the one it will serve. A frontmatter slug keeps the URL.
+      const moving = files.get(from);
+      const origin = moving?.drafted?.op === 'rename' ? moving.drafted.oldPath : from;
+      const oldUrl = head.find((row) => root + row.rel === origin)?.url ?? null;
+      const relPaths = new Set(
+        [...files.keys()].filter((p) => p !== from).map((p) => p.slice(root.length)),
+      );
+      relPaths.add(to.slice(root.length));
+      const parsed = moving ? parse(moving.bytes.toString('utf8'), { filename: from }) : null;
+      const slug = parsed?.ok ? inspectFrontmatter(parsed.doc).known.slug : undefined;
+      const newUrl = pageUrl(to.slice(root.length), relPaths, slug);
+
+      const plan = planRename({ from, to, files: [...files.values()], config, oldUrl, newUrl });
+      const saved = await saveDraftFiles(db, {
+        draftId: draft.id,
+        ifMatch: ifMatch(request),
+        files: plan.changes,
+        remove: plan.remove,
+      });
+      sendJson(response, 200, {
+        version: saved.version,
+        path: to,
+        redirect: plan.redirect,
+        patched: plan.patched,
+        rawMentions: plan.rawMentions,
       });
       return;
     }

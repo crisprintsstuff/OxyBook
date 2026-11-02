@@ -25,6 +25,7 @@ export {
   removeDraftFile,
   type SaveFileInput,
   saveDraftFile,
+  saveDraftFiles,
 } from './drafts.js';
 export {
   conflictCount,
@@ -55,3 +56,4 @@ export {
   type RebaseOutcome,
   rebaseDrafts,
 } from './rebase.js';
+export { type FileChange, planRename, type RenamePlan, type SpaceFile } from './rename.js';
