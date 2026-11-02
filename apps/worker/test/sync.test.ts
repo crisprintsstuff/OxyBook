@@ -169,12 +169,16 @@ describe('worker sync and reconcile', { skip: url ? false : 'DATABASE_URL is not
     );
     await until(async () => existsSync(siteHome));
     assert.match(readFileSync(siteHome, 'utf8'), /<h1 id="home">Home<\/h1>/);
-    const buildRow = await db
-      .selectFrom('builds')
-      .select(['status', 'version'])
-      .where('space_id', '=', spaceId)
-      .orderBy('created_at', 'desc')
-      .executeTakeFirstOrThrow();
+    // The site goes live before the build row is marked; wait for the row too.
+    const latestBuild = () =>
+      db
+        .selectFrom('builds')
+        .select(['status', 'version'])
+        .where('space_id', '=', spaceId)
+        .orderBy('created_at', 'desc')
+        .executeTakeFirstOrThrow();
+    await until(async () => (await latestBuild()).status !== 'running');
+    const buildRow = await latestBuild();
     assert.equal(buildRow.status, 'succeeded');
     assert.equal(buildRow.version, 'default');
   });
