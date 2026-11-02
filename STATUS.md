@@ -6,7 +6,7 @@ Commit SHAs and CI run ids belong in dated Changelog entries, not in `## Current
 
 ## Current state
 
-- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) is in progress (`docs/M3-PLAN.md`): slices 1–3 (block-level conflicts, the conflict view, and rename/move with redirects and link patches) are done; slice 4, committing inferred redirects by PR, is next.
+- **Milestone:** M0, M1, and M2 complete. M2's exit sentence was measured with `pnpm m2:exit` on the owner's machine on 2026-11-01 (below). Released as `v0.1.0` (source mode only); `v0.2.0` (the visual editor) is next. M3 (conflicts, versions, renames) is in progress (`docs/M3-PLAN.md`): slices 1–4 (block-level conflicts, the conflict view, rename/move with redirects and link patches, and committing inferred redirects) are done; slice 5, versions in sync and build, is next.
 - **Last update:** 2026-11-01.
 - **Round-trip and editor document bridge (`packages/doc-model`):** parses `.md` and `.mdx`, keeps original slices, and serializes an unedited file back to the same string. `:::name Title` is one callout block. `openEditorDocument`, `sourceDocToEditorState`, `serializeEditorState`, `markBlocksDirtyFromPmSteps`, `updateEditorBlock`, `moveEditorBlock`, `deleteEditorBlock`, `insertEditorBlock`, `inspectFrontmatter`, and `updateEditorFrontmatter` bridge `SourceDoc` to the ProseMirror/TipTap block/inline schema (`paragraph`, `heading`, `code_block`, `blockquote`, `alert`, `callout`, `bullet_list`, `ordered_list`, `task_list`, `table`, `horizontal_rule`, `raw_block`, `raw_inline`, plus `strong`/`em`/`strike`/`code`/`link` marks with reference-link and hard-break preservation), enforce the load-time identity check (`source-only` fallback on unparseable or identity failure), and re-serialize only dirty blocks while keeping unedited and moved blocks byte-exact. `pnpm test:corpus` reports 594 pass, 0 fail, 1 unparseable (the planted fixture). It runs in CI.
 - **Compatibility report:** `pnpm oxybook-check <dir>` lists what would render as a placeholder, with `file:line`. `pnpm compat:corpus` runs it over the corpus. Over the corpus, 50.4% of files are clean with the starting allowlist and 62.1% with Starlight's built-ins. The recommended component list and the design corrections are in `docs/M1-NOTES.md`.
@@ -58,7 +58,7 @@ For the next session, human or agent.
 - **Resume here:**
   - **Try the editor live:** after pulling, `pnpm install --frozen-lockfile` and restart `pnpm dev`, then **Edit pages** on `cris/test` (LIVE-INSTALL.md, "Edit in the browser"). Not yet run on the owner's machine.
   - **Cut `v0.2.0`** (`docs/RELEASING.md`): M2 is complete.
-  - **M3** (`docs/M3-PLAN.md`): slice 4, inferred redirects committed by PR (through slice 3's `appendRedirect`).
+  - **M3** (`docs/M3-PLAN.md`): slice 5, versions in sync and build (`versions:` from the default ref, every listed branch and tag synced and built under its prefix, one release with the switcher).
   - **After pulling slice 3:** restart `pnpm dev` (migration `0007` applies on start), then **Sync & rebuild** each space once, so OxyBook records its `oxybook.yml`. Until then a rename answers "sync the space once".
   - **Open on `oxybook-test`:** [#7](https://github.com/crisprintsstuff/oxybook-test/pull/7), the user-authored test PR. Merging it should mark its draft `merged`.
 - **Owner's live setup:** App `oxybook-cris`, installed on `crisprintsstuff/oxybook-test` (its App id and installation id are stored in the database), space `cris/test` (content root `docs`, ref `main`), `.env` holding `OXYBOOK_SECRET_KEY`, `OXYBOOK_PUBLIC_URL=https://oxybook.example.com`, `PORT=3100`, `HEALTH_PORT=3101`, `CADDY_PORT=8180`, `OXYBOOK_SITES_VOLUME=./.oxybook-sites`, and `DATABASE_URL`. Compose `postgres` and `caddy` are running (`http://test.docs.localhost:8180/`).
@@ -116,6 +116,19 @@ Still unverified. These are not the exit sentence, and they are not done:
 4. **The site updates.** Met. `/m2-exit` on the published site showed the new paragraph 4 seconds after the merge, from the push webhook with no manual sync, and the draft moved to `merged` from the `pull_request` webhook.
 
 ## Changelog
+
+### 2026-11-02 — M3 slice 4: inferred redirects become commits
+
+- The space page lists inferred redirects (pages renamed outside OxyBook, which the site already redirects) with their old and new URLs and paths.
+- Space admins get **Commit redirects** (`POST /orgs/:org/spaces/:space/redirects/commit`, `apps/server/src/redirects.ts`):
+  - It adds every inferred redirect `oxybook.yml` does not have yet to the admin's draft, through slice 3's `appendRedirect`, and creates the file when absent.
+  - A draft holding nothing else is proposed at once (App- or user-authored as usual). Otherwise the redirect joins the admin's open draft, to be proposed from the editor.
+  - It refuses non-admins, a conflicted draft, a space whose config is not recorded yet ("sync once"), and redirects already present.
+- Sync retires an inferred redirect once `oxybook.yml` on the ref has a `redirects:` entry from the same URL (`parseRedirectSources`). It runs after this sync's own rename detection, so the PR from a rename made in OxyBook does not leave a duplicate.
+- Tests:
+  - `apps/server/test/redirects.test.ts` (PostgreSQL): admin only, sync once, adds and proposes, already present, and adds to a busy draft without proposing.
+  - Sync test: an inferred redirect is retired after `oxybook.yml` commits it.
+  - Server suite 37 pass, sync 13.
 
 ### 2026-11-02 — M3 slice 3: rename and move from the editor
 

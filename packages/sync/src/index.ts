@@ -23,6 +23,7 @@ export {
   pageMeta,
   pageUrl,
   parseExcludeList,
+  parseRedirectSources,
   relativeToRoot,
 } from './pages.js';
 export {

@@ -10,6 +10,7 @@ import {
   type SpaceRole,
 } from '@oxybook/db';
 import type { AppCredentials, InstalledRepository, MemoryAppCredentials } from '@oxybook/github';
+import type { JobQueue } from '@oxybook/jobs';
 import {
   createOrgForUser,
   createSpaceForUser,
@@ -40,6 +41,12 @@ import {
   verifyCsrfToken,
 } from './auth.js';
 import { handleGithubOAuth } from './github-oauth.js';
+import {
+  commitInferredRedirects,
+  type InferredRedirect,
+  listInferredRedirects,
+  RedirectCommitError,
+} from './redirects.js';
 
 export interface UiRouteOptions {
   db: Kysely<Database>;
@@ -58,6 +65,8 @@ export interface UiRouteOptions {
     syncNow?: boolean;
   }) => Promise<{ jobId?: string | null; synced?: boolean; built?: boolean }>;
   now?: () => Date;
+  /** The job queue, for a redirect commit that proposes on its own. */
+  jobs?: Pick<JobQueue, 'send'>;
 }
 
 function escapeHtml(text: string): string {
@@ -601,8 +610,36 @@ function renderSpacePage(input: {
   sitesPort?: string | number;
   error?: string;
   notice?: string;
+  inferred?: InferredRedirect[];
 }): string {
   const { space } = input;
+  const inferred = input.inferred ?? [];
+  const inferredSection =
+    inferred.length > 0
+      ? `<section class="card">
+          <h2>Inferred redirects (${inferred.length})</h2>
+          <p class="muted">Pages renamed outside OxyBook. The site already redirects their old URLs; committing writes the redirects to <code>oxybook.yml</code> through a pull request so they stay when the history moves on.</p>
+          <table>
+            <thead><tr><th>Old URL</th><th>New URL</th><th>Renamed</th></tr></thead>
+            <tbody>
+              ${inferred
+                .map(
+                  (r) =>
+                    `<tr><td><code>${escapeHtml(r.fromUrl)}</code></td><td><code>${escapeHtml(r.toUrl)}</code></td><td class="muted"><code>${escapeHtml(r.fromPath)}</code> → <code>${escapeHtml(r.toPath)}</code></td></tr>`,
+                )
+                .join('')}
+            </tbody>
+          </table>
+          ${
+            space.userRole === 'admin'
+              ? `<form method="post" action="/orgs/${encodeURIComponent(space.orgSlug)}/spaces/${encodeURIComponent(space.slug)}/redirects/commit">
+                  <input type="hidden" name="_csrf" value="${escapeHtml(input.csrfToken)}">
+                  <button type="submit">Commit redirects</button>
+                </form>`
+              : ''
+          }
+        </section>`
+      : '';
   const siteUrl = formatPublishedSiteUrl(space.slug, input.sitesDomain, input.sitesPort);
   const errHtml = input.error ? `<div class="alert-error">${escapeHtml(input.error)}</div>` : '';
   const noticeHtml = input.notice ? `<div class="alert-ok">${escapeHtml(input.notice)}</div>` : '';
@@ -719,6 +756,8 @@ function renderSpacePage(input: {
           </div>
         </div>
       </section>
+
+      ${inferredSection}
 
       <section class="card">
         <h2>Synced pages (${space.pages.length})</h2>
@@ -1175,6 +1214,10 @@ export function createUiRoutes(options: UiRouteOptions): {
               user: session.user,
               csrfToken: session.csrfToken,
               space: details,
+              inferred: await listInferredRedirects(db, {
+                id: details.id,
+                ref: details.defaultRef,
+              }),
               sitesDomain,
               sitesPort,
               ...(url.searchParams.get('error')
@@ -1252,6 +1295,53 @@ export function createUiRoutes(options: UiRouteOptions): {
               `/orgs/${encodeURIComponent(orgSlug)}/spaces/${encodeURIComponent(spaceSlug)}?error=${encodeURIComponent(message)}`,
             );
           }
+        }
+        return true;
+      }
+
+      // 10b. Commit inferred redirects: POST /orgs/:org/spaces/:space/redirects/commit
+      const redirectsMatch = /^\/orgs\/([a-z0-9-]+)\/spaces\/([a-z0-9-]+)\/redirects\/commit$/.exec(
+        pathname,
+      );
+      if (method === 'POST' && redirectsMatch?.[1] && redirectsMatch[2]) {
+        const session = await currentSession(request);
+        if (!session) {
+          redirect(response, '/login');
+          return true;
+        }
+        if (!checkCsrf(request, parseBodyParams(request, rawBody), session.csrfToken)) {
+          sendHtml(response, 403, 'invalid CSRF token');
+          return true;
+        }
+        const back = `/orgs/${encodeURIComponent(redirectsMatch[1])}/spaces/${encodeURIComponent(redirectsMatch[2])}`;
+        const details = await getSpaceDetails(
+          db,
+          session.user.id,
+          redirectsMatch[1],
+          redirectsMatch[2],
+        );
+        if (!details) {
+          sendHtml(response, 404, 'no such space');
+          return true;
+        }
+        try {
+          const result = await commitInferredRedirects(db, {
+            userId: session.user.id,
+            spaceId: details.id,
+            ...(options.jobs ? { jobs: options.jobs } : {}),
+          });
+          const what = `${result.added} ${result.added === 1 ? 'redirect' : 'redirects'}`;
+          redirect(
+            response,
+            `${back}?notice=${encodeURIComponent(
+              result.proposed
+                ? `Added ${what} to oxybook.yml and queued a pull request; the editor shows its link.`
+                : `Added ${what} to oxybook.yml in your open draft; propose it from the editor.`,
+            )}`,
+          );
+        } catch (error) {
+          if (!(error instanceof RedirectCommitError)) throw error;
+          redirect(response, `${back}?error=${encodeURIComponent(error.message)}`);
         }
         return true;
       }
