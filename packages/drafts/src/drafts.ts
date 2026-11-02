@@ -249,11 +249,10 @@ export interface SaveFileInput {
   bytes?: Buffer;
 }
 
-/** Save one file into the draft. Returns the draft with its new version. */
-export async function saveDraftFile(db: Executor, input: SaveFileInput): Promise<Draft> {
-  const draft = await getDraft(db, input.draftId);
-  if (!draft) throw new DraftInputError(`draft ${input.draftId} does not exist`);
-  const root = await contentRootOf(db, draft.spaceId);
+type FileInput = Omit<SaveFileInput, 'draftId' | 'ifMatch'>;
+
+/** Check one file change against the path guards and its op; returns its draft row. */
+function checkFile(input: FileInput, root: string) {
   let target: string;
   let oldPath: string | null = null;
   try {
@@ -278,28 +277,57 @@ export async function saveDraftFile(db: Executor, input: SaveFileInput): Promise
       `${target} is ${input.bytes.byteLength} bytes; the limit is ${MAX_FILE_BYTES}`,
     );
   }
+  return {
+    path: target,
+    op: input.op,
+    old_path: oldPath,
+    base_blob_sha: input.baseBlobSha ?? null,
+    bytes: input.bytes ?? null,
+  };
+}
+
+/** Save one file into the draft. Returns the draft with its new version. */
+export async function saveDraftFile(db: Executor, input: SaveFileInput): Promise<Draft> {
+  return saveDraftFiles(db, { draftId: input.draftId, ifMatch: input.ifMatch, files: [input] });
+}
+
+/**
+ * Save several files, and drop others, as one change: one version bump, all or nothing.
+ * A rename uses it for the move, the redirect, and the link patches together.
+ */
+export async function saveDraftFiles(
+  db: Executor,
+  input: { draftId: string; ifMatch: number; files: FileInput[]; remove?: string[] },
+): Promise<Draft> {
+  const draft = await getDraft(db, input.draftId);
+  if (!draft) throw new DraftInputError(`draft ${input.draftId} does not exist`);
+  const root = await contentRootOf(db, draft.spaceId);
+  const rows = input.files.map((file) => checkFile(file, root));
+  if (new Set(rows.map((r) => r.path)).size !== rows.length)
+    throw new DraftInputError('one change per path');
   return db.transaction().execute(async (trx) => {
     const next = await claimVersion(trx, draft.id, input.ifMatch);
-    await trx
-      .insertInto('draft_files')
-      .values({
-        org_id: draft.orgId,
-        draft_id: draft.id,
-        path: target,
-        op: input.op,
-        old_path: oldPath,
-        base_blob_sha: input.baseBlobSha ?? null,
-        bytes: input.bytes ?? null,
-      })
-      .onConflict((oc) =>
-        oc.columns(['draft_id', 'path']).doUpdateSet({
-          op: input.op,
-          old_path: oldPath,
-          base_blob_sha: input.baseBlobSha ?? null,
-          bytes: input.bytes ?? null,
-        }),
-      )
-      .execute();
+    if (input.remove?.length) {
+      await trx
+        .deleteFrom('draft_files')
+        .where('draft_id', '=', draft.id)
+        .where('path', 'in', input.remove)
+        .execute();
+    }
+    for (const row of rows) {
+      await trx
+        .insertInto('draft_files')
+        .values({ org_id: draft.orgId, draft_id: draft.id, ...row })
+        .onConflict((oc) =>
+          oc.columns(['draft_id', 'path']).doUpdateSet({
+            op: row.op,
+            old_path: row.old_path,
+            base_blob_sha: row.base_blob_sha,
+            bytes: row.bytes,
+          }),
+        )
+        .execute();
+    }
     return next;
   });
 }

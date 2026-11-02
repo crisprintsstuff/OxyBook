@@ -134,26 +134,34 @@ export function buildTreeRows(input: {
     othersEditing: string[];
     added: boolean;
   };
-  const entries: Entry[] = input.pages.map((p) => ({
-    path: p.path,
-    rel: p.relPath,
-    label: p.navTitle || p.title || p.relPath,
-    hidden: p.hidden,
-    othersEditing: p.othersEditing,
-    added: false,
-  }));
+  // A page moved in the draft shows under its new path only.
+  const movedAway = new Set(
+    (input.draft?.files ?? []).flatMap((f) => (f.op === 'rename' && f.oldPath ? [f.oldPath] : [])),
+  );
+  const entries: Entry[] = input.pages
+    .filter((p) => !movedAway.has(p.path))
+    .map((p) => ({
+      path: p.path,
+      rel: p.relPath,
+      label: p.navTitle || p.title || p.relPath,
+      hidden: p.hidden,
+      othersEditing: p.othersEditing,
+      added: false,
+    }));
   const known = new Set(entries.map((e) => e.path));
   for (const file of input.draft?.files ?? []) {
     if ((file.op === 'add' || file.op === 'rename') && !known.has(file.path)) {
       if (!PAGE_FILE.test(file.path)) continue;
       const rel = stripRoot(file.path, input.contentRoot);
+      // A moved page keeps its title.
+      const was = input.pages.find((p) => p.path === file.oldPath);
       entries.push({
         path: file.path,
         rel,
-        label: rel.split('/').pop() ?? rel,
-        hidden: false,
+        label: was ? was.navTitle || was.title || rel : (rel.split('/').pop() ?? rel),
+        hidden: was?.hidden ?? false,
         othersEditing: [],
-        added: true,
+        added: file.op === 'add',
       });
     }
   }
@@ -329,4 +337,33 @@ export function resolvedText(
 /** A region's text without the blank lines that separate it from the block before. */
 export function displayBlock(text: string): string {
   return text.replace(/^(\r?\n)+/, '');
+}
+
+/** What `POST draft/rename` reports. */
+export interface RenameReport {
+  version: number;
+  path: string;
+  redirect: { from: string; to: string } | null;
+  patched: { path: string; links: number }[];
+  rawMentions: { path: string; line: number }[];
+}
+
+/** A one-paragraph summary of a rename for the notice bar. */
+export function describeRename(report: RenameReport): string {
+  const links = report.patched.reduce((n, p) => n + p.links, 0);
+  const files = report.patched.length;
+  const parts = [`Moved to ${report.path}.`];
+  if (links)
+    parts.push(
+      `Updated ${links} ${links === 1 ? 'link' : 'links'} in ${files} ${files === 1 ? 'file' : 'files'}.`,
+    );
+  if (report.redirect)
+    parts.push(`${report.redirect.from} will redirect to ${report.redirect.to}.`);
+  if (report.rawMentions.length)
+    parts.push(
+      `Check by hand: raw HTML or JSX mentions the old name in ${report.rawMentions
+        .map((m) => `${m.path}:${m.line}`)
+        .join(', ')}.`,
+    );
+  return parts.join(' ');
 }

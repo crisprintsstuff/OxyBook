@@ -88,7 +88,13 @@ try {
     .execute();
   await db
     .insertInto('ref_state')
-    .values({ org_id: org.id, space_id: space.id, ref: 'main', head_sha: 'c'.repeat(40) })
+    .values({
+      org_id: org.id,
+      space_id: space.id,
+      ref: 'main',
+      head_sha: 'c'.repeat(40),
+      config_blob_sha: 'none',
+    })
     .execute();
   for (const [path, text, title, page] of [
     ['guide.mdx', PAGE, 'Guide', '/guide'],
@@ -302,9 +308,44 @@ try {
     .select(['state', 'base_sha'])
     .executeTakeFirstOrThrow();
   assert.deepEqual(after, { state: 'proposed', base_sha: 'e'.repeat(40) });
+
+  // Rename the Install page: one draft change with the move, the redirect, and the links.
+  await page.getByRole('button', { name: 'Install', exact: true }).click();
+  await page.locator('.pagebar code', { hasText: 'docs/install.md' }).waitFor();
+  page.once('dialog', (dialog: any) => void dialog.accept('setup/install.md'));
+  await page.getByRole('button', { name: 'Rename / move' }).click();
+  await page.locator('.pagebar code', { hasText: 'docs/setup/install.md' }).waitFor();
+  const notice = (await page.locator('.banner.info', { hasText: 'Moved to' }).textContent()) ?? '';
+  assert.match(notice, /Updated 2 links in 1 file\./);
+  assert.match(notice, /\/install will redirect to \/setup\/install\./);
+  const renamed = await db
+    .selectFrom('draft_files')
+    .select(['path', 'op', 'old_path', 'bytes'])
+    .orderBy('path')
+    .execute();
+  assert.deepEqual(
+    renamed.map((f) => [f.path, f.op, f.old_path]),
+    [
+      ['docs/guide.mdx', 'modify', null],
+      ['docs/setup/install.md', 'rename', 'docs/install.md'],
+      ['oxybook.yml', 'add', null],
+    ],
+  );
+  assert.equal(
+    renamed[0]?.bytes?.toString('utf8'),
+    expected
+      .replace(
+        'Read the [install page](install.md).',
+        'Read the [install guide](install.md) first.',
+      )
+      .replaceAll('(install.md)', '(setup/install.md)'),
+  );
+  await page.screenshot({
+    path: (process.env.E2E_SCREENSHOT ?? '/tmp/editor-e2e.png').replace('.png', '-rename.png'),
+  });
   assert.deepEqual(errors, []);
   console.log(
-    'editor e2e: visual edit, link picker, page settings, source mode, diff, propose, conflict resolution: ok',
+    'editor e2e: visual edit, link picker, page settings, source mode, diff, propose, conflict resolution, rename: ok',
   );
 } finally {
   await browser?.close();

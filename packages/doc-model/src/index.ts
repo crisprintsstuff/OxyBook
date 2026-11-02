@@ -14,6 +14,7 @@ export {
   STARTING_ALLOWLIST,
   summarize,
 } from './compat.js';
+export { appendRedirect, ConfigEditError } from './config-edit.js';
 export { insertIntoTextSpan, listPlainTextSpans, reformatBlock } from './edit.js';
 export {
   type AlertKind,
@@ -53,6 +54,16 @@ export {
   updateFrontmatterField,
 } from './frontmatter.js';
 export { checkIdentity, divergence } from './identity.js';
+export {
+  hrefBetween,
+  isExternalHref,
+  type LinkScan,
+  type LinkSpan,
+  resolveHref,
+  rewriteLinks,
+  scanLinks,
+  splitHref,
+} from './links.js';
 export { formatFromFilename, parse, parseOrThrow } from './parse.js';
 export { type ChangeRegion, changedRegion, isLineAligned, regionWithin } from './range.js';
 export { exitCodeFor, formatReport, listMarkdownFiles, roundtripPath } from './roundtrip.js';

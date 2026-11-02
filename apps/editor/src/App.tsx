@@ -8,6 +8,7 @@ import {
   altText,
   buildTreeRows,
   type DraftSummary,
+  describeRename,
   describeWarning,
   type FileOp,
   newPagePath,
@@ -342,6 +343,34 @@ export function App({ api }: { api: EditorApi }) {
     await loadPage(result.path, { op: 'add', source: newPageSource(result.path) });
   }
 
+  async function renamePage() {
+    const current = pageRef.current;
+    if (!current || !tree) return;
+    const root = tree.space.contentRoot ? `${tree.space.contentRoot}/` : '';
+    const typed = window.prompt(
+      `Rename or move ${current.path}. New path, relative to ${tree.space.contentRoot || 'the repository root'}:`,
+      current.path.slice(root.length),
+    );
+    if (typed === null) return;
+    const result = newPagePath(typed, tree.space.contentRoot);
+    if ('error' in result) {
+      setNotice(result.error);
+      return;
+    }
+    try {
+      await flush();
+      const ifMatch = await ensureDraft();
+      const report = await api.rename(ifMatch, current.path, result.path);
+      version.current = report.version;
+      await refreshDraft();
+      savedText.current = text.current;
+      await loadPage(report.path);
+      setNotice(describeRename(report));
+    } catch (error) {
+      setNotice(`Rename failed: ${errorText(error)}`);
+    }
+  }
+
   async function revertPage() {
     const current = pageRef.current;
     if (!current || version.current === null) return;
@@ -581,7 +610,12 @@ export function App({ api }: { api: EditorApi }) {
                         if (file) void uploadImage(file);
                       }}
                     />
-                    {mine && (
+                    {/\.mdx?$/i.test(page.path) && (
+                      <button type="button" onClick={() => void renamePage()}>
+                        Rename / move
+                      </button>
+                    )}
+                    {mine && mine.op !== 'rename' && (
                       <button type="button" onClick={() => void revertPage()}>
                         Revert page
                       </button>

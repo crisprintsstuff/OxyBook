@@ -41,6 +41,7 @@ describe('schema v0 migrations', { skip: url ? false : 'DATABASE_URL is not set'
         '0004_builds',
         '0005_propose',
         '0006_github_accounts',
+        '0007_config_blob',
       ],
     });
     assert.deepEqual(await migrateToLatest(db, { schema }), { applied: [] });

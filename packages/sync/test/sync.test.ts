@@ -223,5 +223,12 @@ describe('sync', { skip: url ? false : 'DATABASE_URL is not set' }, () => {
     const stored = await pagesInDb();
     assert.ok(!stored.includes('secret/hidden-doc.md'));
     assert.ok(!stored.includes('draft.wip.md'));
+    // The config's blob is recorded with the head, and its bytes are stored, for the app.
+    const state = await db
+      .selectFrom('ref_state')
+      .innerJoin('blobs', 'blobs.sha', 'ref_state.config_blob_sha')
+      .select(['blobs.bytes as bytes'])
+      .executeTakeFirstOrThrow();
+    assert.equal(state.bytes.toString(), 'exclude:\n  - secret\n  - "*.wip.md"\n');
   });
 });

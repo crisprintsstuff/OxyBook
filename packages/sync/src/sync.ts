@@ -70,6 +70,7 @@ export async function syncSpace(
   const configEntries = await listFiles(source.mirrorDir, to, 'oxybook.yml');
   const configEntry = configEntries.find((entry) => entry.path === 'oxybook.yml');
   let excludePatterns: string[] = [];
+  let configBlob: { sha: string; bytes: Buffer } | null = null;
   if (configEntry) {
     const cachedConfig = await db
       .selectFrom('blobs')
@@ -81,6 +82,7 @@ export async function syncSpace(
       cachedConfig?.bytes ??
       (await readBlobs(source.mirrorDir, [configEntry.blob], source.token)).get(configEntry.blob);
     if (configBytes) {
+      configBlob = { sha: configEntry.blob, bytes: configBytes };
       excludePatterns = parseExcludeList(configBytes);
     }
   }
@@ -196,11 +198,29 @@ export async function syncSpace(
         .onConflict((oc) => oc.columns(['org_id', 'sha']).doNothing())
         .execute();
     }
+    if (configBlob) {
+      await trx
+        .insertInto('blobs')
+        .values({ org_id: target.orgId, sha: configBlob.sha, bytes: configBlob.bytes })
+        .onConflict((oc) => oc.columns(['org_id', 'sha']).doNothing())
+        .execute();
+    }
+    const configBlobSha = configBlob?.sha ?? 'none';
     await trx
       .insertInto('ref_state')
-      .values({ org_id: target.orgId, space_id: target.spaceId, ref: target.ref, head_sha: to })
+      .values({
+        org_id: target.orgId,
+        space_id: target.spaceId,
+        ref: target.ref,
+        head_sha: to,
+        config_blob_sha: configBlobSha,
+      })
       .onConflict((oc) =>
-        oc.columns(['space_id', 'ref']).doUpdateSet({ head_sha: to, synced_at: sql`now()` }),
+        oc.columns(['space_id', 'ref']).doUpdateSet({
+          head_sha: to,
+          config_blob_sha: configBlobSha,
+          synced_at: sql`now()`,
+        }),
       )
       .execute();
     // Delete before insert: url is unique per (space, ref), and two pages can swap URLs.
