@@ -130,7 +130,7 @@ versions:
     ref: v1.0.0            # a tag: published, read-only in the editor
 ```
 
-Each version is built from its own ref, with that ref's content and `_dir.yml` files, so documentation for an old release lives on the release branch next to the code it describes. Editing an older version opens a PR against that branch. Tags are published but cannot be edited (you cannot open a PR into a tag). The `versions:` list is read from the default ref only, so one file controls the switcher. Rejected: Docusaurus-style `versioned_docs/` snapshots duplicate content inside one branch, and fixes then have to be applied N times by hand; git already has a primitive for "the docs as of release X".
+Each version is built from its own ref, with that ref's content and `_dir.yml` files, so documentation for an old release lives on the release branch next to the code it describes. The default version is always the space's default branch; `default: true` only names it when no entry lists that branch. A `ref:` is looked up as a branch first, then as a tag. A version name is a URL segment (letters, digits, `.`, `_`, `-`), and `default` and `pagefind` are reserved. Editing an older version opens a PR against that branch. Tags are published but cannot be edited (you cannot open a PR into a tag). The `versions:` list is read from the default ref only, so one file controls the switcher. Rejected: Docusaurus-style `versioned_docs/` snapshots duplicate content inside one branch, and fixes then have to be applied N times by hand; git already has a primitive for "the docs as of release X".
 
 ## 3. Editor
 

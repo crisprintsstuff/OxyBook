@@ -19,6 +19,7 @@ export interface Database {
   github_accounts: GithubAccountsTable;
   webhook_deliveries: WebhookDeliveriesTable;
   inferred_redirects: InferredRedirectsTable;
+  space_versions: SpaceVersionsTable;
   builds: BuildsTable;
 }
 
@@ -101,6 +102,17 @@ export interface RefStateTable {
   synced_at: ColumnType<Date, Date | string | undefined, Date | string>;
   /** `oxybook.yml`'s blob at the head (0007); 'none' when the ref has none; null when not recorded yet. */
   config_blob_sha: ColumnType<string | null, string | null | undefined, string | null>;
+}
+
+/** 0008_space_versions: `versions:` of oxybook.yml on the default ref, resolved. */
+export interface SpaceVersionsTable {
+  org_id: string;
+  space_id: string;
+  name: string;
+  /** A branch name, or `refs/tags/<name>`. */
+  ref: string;
+  is_default: Generated<boolean>;
+  position: number;
 }
 
 export interface PagesTable {

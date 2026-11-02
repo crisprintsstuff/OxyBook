@@ -64,6 +64,7 @@ export {
   type BuildEnvironment,
   runSpaceBuild,
   type SpaceBuildResult,
+  VersionNotListed,
 } from './runner.js';
 export {
   type DocumentHtmlOptions,

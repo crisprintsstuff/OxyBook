@@ -79,6 +79,19 @@ export interface BuildVersionInput {
   assets?: readonly BuildAssetInput[];
   /** Out-of-band rename redirects recorded by sync (`inferred_redirects`). */
   inferredRedirects?: readonly { from: string; to: string }[];
+  /**
+   * The space's published versions, default first (`space_versions`), for the switcher.
+   * `urls` are the version's page URLs without prefix: a page links to the same URL in
+   * another version, or to that version's root when the page is absent there. When
+   * absent, the switcher comes from this ref's own `versions:` and links to roots.
+   */
+  versionSwitch?: readonly { name: string; isDefault: boolean; urls: ReadonlySet<string> }[];
+  /**
+   * Non-default version names still published. A version directory not listed is left out
+   * of the release (the version was removed from `versions:`). When absent, every built
+   * version is kept.
+   */
+  liveVersions?: readonly string[];
   /** How many recent builds/releases to retain per version (default 5). */
   keepBuilds?: number;
   /** Run Pagefind to generate `/pagefind/*` static search bundle (default true). */
@@ -298,22 +311,36 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
 
   const rootDirConfig = parsedDirs.get('');
   const siteTitle = config.title ?? rootDirConfig?.title ?? input.spaceName;
-  const versionLinks =
-    config.versions.length > 1
-      ? config.versions.map((v, idx) => {
-          const isDef = v.default ?? idx === 0;
+  const switchLinks = (pageUrl: string) =>
+    input.versionSwitch && input.versionSwitch.length > 1
+      ? input.versionSwitch.map((v) => {
+          const prefix = v.isDefault ? undefined : v.name;
           return {
             name: v.name,
-            url: isDef ? '/' : `/${v.name.replace(/^\/+|\/+$/g, '')}/`,
-            current: v.name === input.version || (isDef && isDefault),
+            url: applyVersionPrefix(v.urls.has(pageUrl) ? pageUrl : '/', prefix),
+            current: v.isDefault ? isDefault : !isDefault && v.name === input.version,
           };
         })
       : undefined;
+  const versionLinks =
+    input.versionSwitch !== undefined
+      ? switchLinks('/')
+      : config.versions.length > 1
+        ? config.versions.map((v, idx) => {
+            const isDef = v.default ?? idx === 0;
+            return {
+              name: v.name,
+              url: isDef ? '/' : `/${v.name.replace(/^\/+|\/+$/g, '')}/`,
+              current: v.name === input.version || (isDef && isDefault),
+            };
+          })
+        : undefined;
 
   const activePages = input.pages
     .filter((p) => !isExcluded(p.path, config.exclude))
     .map((p) => ({
       ...p,
+      baseUrl: p.url,
       url: applyVersionPrefix(p.url, versionPrefix),
     }));
   const activeAssets = (input.assets ?? []).filter((a) => !isExcluded(a.path, config.exclude));
@@ -398,6 +425,7 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
       emit(`warn ${page.path}:${bl.line ?? '?'} broken-link ${bl.href}`);
     }
 
+    const pageVersionLinks = input.versionSwitch ? switchLinks(page.baseUrl) : versionLinks;
     const html = renderDocumentHtml({
       siteTitle,
       pageTitle: page.title || rendered.searchDoc.title,
@@ -407,7 +435,7 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
       nav,
       headings: rendered.searchDoc.headings,
       ...(versionPrefix ? { versionPrefix } : {}),
-      ...(versionLinks ? { versions: versionLinks } : {}),
+      ...(pageVersionLinks ? { versions: pageVersionLinks } : {}),
       ...(config.theme ? { theme: config.theme } : {}),
       searchable: !page.hidden,
     });
@@ -472,11 +500,13 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
   mkdirSync(releaseDir, { recursive: true });
 
   const spaceBuildsRoot = path.join(input.sitesDir, 'builds', input.spaceId);
+  const live = input.liveVersions ? new Set(input.liveVersions) : null;
   if (isDefault) {
     hardlinkTree(buildDir, releaseDir);
     if (existsSync(spaceBuildsRoot)) {
       for (const entry of readdirSync(spaceBuildsRoot, { withFileTypes: true })) {
         if (!entry.isDirectory() || entry.name === input.version) continue;
+        if (live && !live.has(entry.name)) continue;
         const otherVerDir = path.join(spaceBuildsRoot, entry.name);
         const latestOther = newestSubdir(otherVerDir);
         if (latestOther) {
@@ -491,6 +521,13 @@ export async function buildSiteVersion(input: BuildVersionInput): Promise<BuildV
     if (existsSync(currentLinkPath)) {
       hardlinkTree(currentLinkPath, releaseDir);
       rmSync(path.join(releaseDir, input.version), { recursive: true, force: true });
+      // Versions removed from the list since the last release stop being served.
+      if (live && existsSync(spaceBuildsRoot)) {
+        for (const entry of readdirSync(spaceBuildsRoot, { withFileTypes: true })) {
+          if (entry.isDirectory() && entry.name !== 'default' && !live.has(entry.name))
+            rmSync(path.join(releaseDir, entry.name), { recursive: true, force: true });
+        }
+      }
     }
     hardlinkTree(buildDir, path.join(releaseDir, input.version));
   }

@@ -10,8 +10,13 @@ export function mirrorPath(mirrorsDir: string, owner: string, repo: string): str
   return path.join(mirrorsDir, safe(owner.toLowerCase()), `${safe(repo.toLowerCase())}.git`);
 }
 
+/** A branch name becomes `refs/heads/<name>`; a full ref (`refs/tags/v1.0`) stays as is. */
+export function fullRef(ref: string): string {
+  return ref.startsWith('refs/') ? ref : `refs/heads/${ref}`;
+}
+
 /**
- * Fetch one branch into the mirror with --filter=blob:none and return its head.
+ * Fetch one branch (or tag) into the mirror with --filter=blob:none and return its head.
  * Trees and commits arrive; blobs are fetched on demand by readBlobs().
  * The ref is force-updated: the remote is the truth, including after a force-push.
  */
@@ -37,14 +42,17 @@ export async function fetchRef(input: {
       '--no-tags',
       '--filter=blob:none',
       'origin',
-      `+refs/heads/${ref}:refs/heads/${ref}`,
+      `+${fullRef(ref)}:${fullRef(ref)}`,
     ],
     { env: authEnv(input.token) },
   );
-  return (await git(mirrorDir, ['rev-parse', `refs/heads/${ref}^{commit}`])).toString().trim();
+  return (await git(mirrorDir, ['rev-parse', `${fullRef(ref)}^{commit}`])).toString().trim();
 }
 
-/** The remote head of a branch without fetching, for reconciliation. Null when absent. */
+/**
+ * The remote commit of a branch or tag without fetching, for reconciliation. Null when
+ * absent. An annotated tag answers with the commit it points to.
+ */
 export async function remoteHead(input: {
   remoteUrl: string;
   ref: string;
@@ -53,16 +61,37 @@ export async function remoteHead(input: {
 }): Promise<string | null> {
   const out = await git(
     input.cwd ?? process.cwd(),
-    ['ls-remote', input.remoteUrl, `refs/heads/${input.ref}`],
+    ['ls-remote', input.remoteUrl, fullRef(input.ref), `${fullRef(input.ref)}^{}`],
     {
       env: authEnv(input.token),
     },
   );
-  const line = out
+  const lines = out
     .toString('utf8')
     .split('\n')
-    .find((entry) => entry.trim().length > 0);
-  return line ? (line.split('\t')[0] ?? null) : null;
+    .filter((entry) => entry.trim().length > 0)
+    .map((entry) => entry.split('\t'));
+  const peeled = lines.find(([, name]) => name?.endsWith('^{}'));
+  return (peeled ?? lines[0])?.[0] ?? null;
+}
+
+/**
+ * What a version's `ref:` names on the remote: a branch (returned as its name), else a
+ * tag (returned as `refs/tags/<name>`), else null. A full `refs/...` is checked as given.
+ */
+export async function resolveRemoteRef(input: {
+  remoteUrl: string;
+  ref: string;
+  token?: string;
+  cwd?: string;
+}): Promise<string | null> {
+  const candidates = input.ref.startsWith('refs/')
+    ? [input.ref]
+    : [input.ref, `refs/tags/${input.ref}`];
+  for (const candidate of candidates) {
+    if (await remoteHead({ ...input, ref: candidate })) return candidate;
+  }
+  return null;
 }
 
 export interface TreeEntry {

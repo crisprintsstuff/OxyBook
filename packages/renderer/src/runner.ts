@@ -12,6 +12,7 @@ import {
   relativeToRoot,
   runSpaceSync,
   type SyncEnvironment,
+  spaceVersions,
 } from '@oxybook/sync';
 import {
   type BuildAssetInput,
@@ -74,6 +75,16 @@ async function loadSpaceForBuild(db: Kysely<Database>, spaceId: string): Promise
   };
 }
 
+export class VersionNotListed extends Error {
+  constructor(
+    readonly spaceId: string,
+    readonly version: string,
+  ) {
+    super(`space ${spaceId} does not list a version ${version}`);
+    this.name = 'VersionNotListed';
+  }
+}
+
 /**
  * Build one version of a space from its synced read model (`pages` + `blobs`) and
  * git mirror (`oxybook.yml`, `_dir.yml`, and assets), record the outcome in `builds`,
@@ -91,8 +102,16 @@ export async function runSpaceBuild(
   } = {},
 ): Promise<SpaceBuildResult> {
   const space = await loadSpaceForBuild(env.db, spaceId);
-  const ref = options.ref ?? space.defaultRef;
   const version = options.version ?? 'default';
+  // Published versions come from the default ref's oxybook.yml (§2.6), stored by sync.
+  const versions = await spaceVersions(env.db, spaceId);
+  const isDefaultVersion = options.isDefaultVersion ?? version === 'default';
+  let ref = options.ref ?? space.defaultRef;
+  if (version !== 'default' && options.ref === undefined) {
+    const listed = versions.find((v) => !v.isDefault && v.name === version);
+    if (!listed) throw new VersionNotListed(spaceId, version);
+    ref = listed.ref;
+  }
 
   let refState = await env.db
     .selectFrom('ref_state')
@@ -256,14 +275,36 @@ export async function runSpaceBuild(
       }
     }
 
+    // The switcher links each page to the same URL in every other version that has it.
+    let versionSwitch:
+      | { name: string; isDefault: boolean; urls: ReadonlySet<string> }[]
+      | undefined;
+    if (versions.length > 1) {
+      const urlRows = await env.db
+        .selectFrom('pages')
+        .select(['ref', 'url'])
+        .where('space_id', '=', spaceId)
+        .where(
+          'ref',
+          'in',
+          versions.map((v) => v.ref),
+        )
+        .execute();
+      versionSwitch = versions.map((v) => ({
+        name: v.name,
+        isDefault: v.isDefault,
+        urls: new Set(urlRows.filter((r) => r.ref === v.ref).map((r) => r.url)),
+      }));
+    }
+
     const result = await buildSiteVersion({
       spaceId: space.spaceId,
       spaceSlug: space.slug,
       spaceName: space.name,
       version,
-      ...(options.isDefaultVersion !== undefined
-        ? { isDefaultVersion: options.isDefaultVersion }
-        : {}),
+      isDefaultVersion,
+      ...(versionSwitch ? { versionSwitch } : {}),
+      liveVersions: versions.filter((v) => !v.isDefault).map((v) => v.name),
       commitSha: headSha,
       buildId: buildRow.id,
       sitesDir: env.sitesDir,

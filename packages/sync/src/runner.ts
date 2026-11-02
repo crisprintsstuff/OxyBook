@@ -9,8 +9,16 @@ import {
   updateGithubTokens,
 } from '@oxybook/db';
 import { InstallationTokenCache, refreshUserToken, signAppJwt } from '@oxybook/github';
-import { fetchRef, mirrorBlobSource, mirrorPath, pushBranch, remoteHead } from './mirror.js';
+import {
+  fetchRef,
+  mirrorBlobSource,
+  mirrorPath,
+  pushBranch,
+  remoteHead,
+  resolveRemoteRef,
+} from './mirror.js';
 import { type SyncResult, syncSpace } from './sync.js';
+import { updateSpaceVersions } from './versions.js';
 
 export interface SyncEnvironment {
   db: Kysely<Database>;
@@ -201,13 +209,14 @@ export async function runSpaceSync(
 ): Promise<SyncResult> {
   const space = await loadSpace(env.db, spaceId);
   const token = await env.tokenFor(space.installationId);
-  return syncSpace(
+  const target = ref ?? space.defaultRef;
+  const result = await syncSpace(
     env.db,
     {
       orgId: space.orgId,
       spaceId: space.spaceId,
       contentRoot: space.contentRoot,
-      ref: ref ?? space.defaultRef,
+      ref: target,
     },
     {
       mirrorDir: mirrorPath(env.mirrorsDir, space.owner, space.repo),
@@ -216,6 +225,41 @@ export async function runSpaceSync(
     },
     env.log ? { log: env.log } : {},
   );
+  if (target === space.defaultRef) {
+    // The default ref's oxybook.yml decides which versions are published (§2.6).
+    const state = await env.db
+      .selectFrom('ref_state')
+      .select('config_blob_sha')
+      .where('space_id', '=', space.spaceId)
+      .where('ref', '=', target)
+      .executeTakeFirst();
+    const sha = state?.config_blob_sha;
+    const config =
+      sha && sha !== 'none'
+        ? ((
+            await env.db
+              .selectFrom('blobs')
+              .select('bytes')
+              .where('org_id', '=', space.orgId)
+              .where('sha', '=', sha)
+              .executeTakeFirst()
+          )?.bytes ?? null)
+        : null;
+    await updateSpaceVersions(env.db, {
+      orgId: space.orgId,
+      spaceId: space.spaceId,
+      defaultRef: space.defaultRef,
+      config,
+      resolve: (versionRef) =>
+        resolveRemoteRef({
+          remoteUrl: remoteUrl(env, space),
+          ref: versionRef,
+          ...(token ? { token } : {}),
+        }),
+      ...(env.log ? { log: env.log } : {}),
+    });
+  }
+  return result;
 }
 
 export interface ReconcileOutcome {
@@ -245,8 +289,23 @@ export async function findStaleSpaces(env: SyncEnvironment): Promise<ReconcileOu
     .where('spaces.repo_owner', 'is not', null)
     .where('spaces.github_installation_id', 'is not', null)
     .execute();
+  // Every published version's ref is checked too, not only the default (§2.6).
+  const versionRefs = await env.db
+    .selectFrom('space_versions')
+    .leftJoin('ref_state', (join) =>
+      join
+        .onRef('ref_state.space_id', '=', 'space_versions.space_id')
+        .onRef('ref_state.ref', '=', 'space_versions.ref'),
+    )
+    .select([
+      'space_versions.space_id as id',
+      'space_versions.ref as ref',
+      'ref_state.head_sha as stored',
+    ])
+    .where('space_versions.is_default', '=', false)
+    .execute();
   const outcomes: ReconcileOutcome[] = [];
-  for (const row of spaces) {
+  for (const row of [...spaces, ...versionRefs.filter((v) => spaces.some((s) => s.id === v.id))]) {
     try {
       const space = await loadSpace(env.db, row.id);
       const token = await env.tokenFor(space.installationId);
